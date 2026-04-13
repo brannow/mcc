@@ -1171,6 +1171,11 @@ impl App {
                     }
                 }
                 EncodeEvent::Completed { job_id, result } => {
+                    // Snapshot elapsed time before it keeps ticking
+                    if let Some(job) = self.encode_queue.iter_mut().find(|j| j.id == job_id) {
+                        job.elapsed_secs = job.started_at.map(|t| t.elapsed().as_secs_f64());
+                    }
+
                     // Find the job's file_index before mutating status
                     let file_index = self
                         .encode_queue
@@ -1483,6 +1488,7 @@ impl App {
             progress: None,
             fps_stats: FpsStats::default(),
             started_at: None,
+            elapsed_secs: None,
             preset_name,
         });
 

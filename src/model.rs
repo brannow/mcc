@@ -315,6 +315,7 @@ pub struct EncodeJob {
     pub progress: Option<FfmpegProgress>,
     pub fps_stats: FpsStats,
     pub started_at: Option<std::time::Instant>,
+    pub elapsed_secs: Option<f64>,
     pub preset_name: String,
 }
 

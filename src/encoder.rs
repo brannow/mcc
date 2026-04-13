@@ -167,32 +167,80 @@ async fn encode_one(
             return EncodeResult::Cancelled;
         }
         FfmpegResult::Failed(msg) => {
-            // Try subtitle fallback: if error mentions subtitle codec
-            if msg.contains("Subtitle") || msg.contains("subtitle") {
-                let retry = run_ffmpeg_with_subtitle_fallback(
-                    job_id,
-                    &temp_source,
-                    &temp_output,
-                    preset,
-                    request.duration_secs,
-                    control_rx,
-                    event_tx,
-                )
-                .await;
-                match retry {
-                    FfmpegResult::Success => {}
-                    FfmpegResult::Cancelled => {
-                        cleanup_temp(&temp_source, &temp_output).await;
-                        return EncodeResult::Cancelled;
-                    }
-                    FfmpegResult::Failed(msg2) => {
-                        cleanup_temp(&temp_source, &temp_output).await;
-                        return EncodeResult::Failed(msg2);
+            // Determine which fallback to try based on error
+            let fallback = if msg.contains("unknown codec")
+                || msg.contains("Unknown codec")
+                || msg.contains("Could not find codec parameters")
+                || msg.contains("unknown encoder")
+            {
+                Some(Fallback::ReencodeAudio)
+            } else if msg.contains("Only audio, video, and subtitles") {
+                Some(Fallback::StreamFilter)
+            } else if msg.contains("Subtitle") || msg.contains("subtitle") {
+                Some(Fallback::SubtitleCodec)
+            } else {
+                None
+            };
+
+            match fallback {
+                Some(fb) => {
+                    let retry = run_ffmpeg_with_fallback(
+                        job_id,
+                        &temp_source,
+                        &temp_output,
+                        preset,
+                        request.duration_secs,
+                        control_rx,
+                        event_tx,
+                        fb,
+                    )
+                    .await;
+                    match retry {
+                        FfmpegResult::Success => {}
+                        FfmpegResult::Cancelled => {
+                            cleanup_temp(&temp_source, &temp_output).await;
+                            return EncodeResult::Cancelled;
+                        }
+                        FfmpegResult::Failed(msg2) => {
+                            // If re-encoding audio also failed with codec errors,
+                            // last resort: video-only (drop undecodable audio)
+                            if matches!(fb, Fallback::ReencodeAudio)
+                                && (msg2.contains("unknown codec")
+                                    || msg2.contains("Could not find codec parameters"))
+                            {
+                                let last_try = run_ffmpeg_with_fallback(
+                                    job_id,
+                                    &temp_source,
+                                    &temp_output,
+                                    preset,
+                                    request.duration_secs,
+                                    control_rx,
+                                    event_tx,
+                                    Fallback::VideoOnly,
+                                )
+                                .await;
+                                match last_try {
+                                    FfmpegResult::Success => {}
+                                    FfmpegResult::Cancelled => {
+                                        cleanup_temp(&temp_source, &temp_output).await;
+                                        return EncodeResult::Cancelled;
+                                    }
+                                    FfmpegResult::Failed(msg3) => {
+                                        cleanup_temp(&temp_source, &temp_output).await;
+                                        return EncodeResult::Failed(msg3);
+                                    }
+                                }
+                            } else {
+                                cleanup_temp(&temp_source, &temp_output).await;
+                                return EncodeResult::Failed(msg2);
+                            }
+                        }
                     }
                 }
-            } else {
-                cleanup_temp(&temp_source, &temp_output).await;
-                return EncodeResult::Failed(msg);
+                None => {
+                    cleanup_temp(&temp_source, &temp_output).await;
+                    return EncodeResult::Failed(msg);
+                }
             }
         }
     }
@@ -318,7 +366,20 @@ async fn run_ffmpeg(
     .await
 }
 
-async fn run_ffmpeg_with_subtitle_fallback(
+#[derive(Clone, Copy)]
+enum Fallback {
+    /// Replace "-map 0" with "-map 0:v -map 0:a -map 0:s?" to skip data/attachment streams
+    StreamFilter,
+    /// Insert "-c:s srt" after "-c copy" for subtitle codec issues
+    SubtitleCodec,
+    /// Replace "-c copy" with "-c:a aac -c:s copy" for unknown/unsupported audio codecs
+    ReencodeAudio,
+    /// Last resort: video + subtitles only, drop undecodable audio
+    VideoOnly,
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_ffmpeg_with_fallback(
     job_id: u64,
     input: &Path,
     output: &Path,
@@ -326,20 +387,99 @@ async fn run_ffmpeg_with_subtitle_fallback(
     duration_secs: Option<f64>,
     control_rx: &mut mpsc::UnboundedReceiver<EncodeControl>,
     event_tx: &mpsc::UnboundedSender<EncodeEvent>,
+    fallback: Fallback,
 ) -> FfmpegResult {
     // Remove existing output from failed first attempt
     let _ = tokio::fs::remove_file(output).await;
 
-    // Insert "-c:s srt" after "-c copy" in the args
     let mut modified_args = Vec::new();
-    let mut i = 0;
-    while i < preset.ffmpeg_args.len() {
-        modified_args.push(preset.ffmpeg_args[i].clone());
-        if preset.ffmpeg_args[i] == "copy" && i > 0 && preset.ffmpeg_args[i - 1] == "-c" {
-            modified_args.push("-c:s".to_string());
-            modified_args.push("srt".to_string());
+    match fallback {
+        Fallback::StreamFilter => {
+            // Replace "-map" "0" with "-map" "0:v" "-map" "0:a" "-map" "0:s?"
+            let mut i = 0;
+            while i < preset.ffmpeg_args.len() {
+                if preset.ffmpeg_args[i] == "-map"
+                    && preset.ffmpeg_args.get(i + 1).map(|s| s.as_str()) == Some("0")
+                {
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:v".to_string());
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:a".to_string());
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:s?".to_string());
+                    i += 2; // skip original "-map" "0"
+                } else {
+                    modified_args.push(preset.ffmpeg_args[i].clone());
+                    i += 1;
+                }
+            }
         }
-        i += 1;
+        Fallback::SubtitleCodec => {
+            // Insert "-c:s srt" after "-c copy"
+            let mut i = 0;
+            while i < preset.ffmpeg_args.len() {
+                modified_args.push(preset.ffmpeg_args[i].clone());
+                if preset.ffmpeg_args[i] == "copy" && i > 0 && preset.ffmpeg_args[i - 1] == "-c" {
+                    modified_args.push("-c:s".to_string());
+                    modified_args.push("srt".to_string());
+                }
+                i += 1;
+            }
+        }
+        Fallback::ReencodeAudio => {
+            // Replace "-c copy" with "-c:a aac -c:s copy" to re-encode audio
+            // Also filter streams to skip unsupported data tracks
+            let mut i = 0;
+            while i < preset.ffmpeg_args.len() {
+                if preset.ffmpeg_args[i] == "-c"
+                    && preset.ffmpeg_args.get(i + 1).map(|s| s.as_str()) == Some("copy")
+                {
+                    modified_args.push("-c:a".to_string());
+                    modified_args.push("aac".to_string());
+                    modified_args.push("-c:s".to_string());
+                    modified_args.push("copy".to_string());
+                    i += 2; // skip original "-c" "copy"
+                } else if preset.ffmpeg_args[i] == "-map"
+                    && preset.ffmpeg_args.get(i + 1).map(|s| s.as_str()) == Some("0")
+                {
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:v".to_string());
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:a".to_string());
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:s?".to_string());
+                    i += 2;
+                } else {
+                    modified_args.push(preset.ffmpeg_args[i].clone());
+                    i += 1;
+                }
+            }
+        }
+        Fallback::VideoOnly => {
+            // Map only video + optional subtitles, drop all audio
+            // Remove "-c copy" since there's nothing left to copy
+            let mut i = 0;
+            while i < preset.ffmpeg_args.len() {
+                if preset.ffmpeg_args[i] == "-map"
+                    && preset.ffmpeg_args.get(i + 1).map(|s| s.as_str()) == Some("0")
+                {
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:v".to_string());
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:s?".to_string());
+                    i += 2;
+                } else if preset.ffmpeg_args[i] == "-c"
+                    && preset.ffmpeg_args.get(i + 1).map(|s| s.as_str()) == Some("copy")
+                {
+                    modified_args.push("-c:s".to_string());
+                    modified_args.push("copy".to_string());
+                    i += 2;
+                } else {
+                    modified_args.push(preset.ffmpeg_args[i].clone());
+                    i += 1;
+                }
+            }
+        }
     }
 
     let _ = event_tx.send(EncodeEvent::StatusChange {
@@ -396,7 +536,8 @@ async fn run_ffmpeg_inner(
 
     // Collect stderr in background for error reporting
     let stderr_handle = tokio::spawn(async move {
-        let mut buf = String::new();
+        let mut error_lines: Vec<String> = Vec::new();
+        let mut tail_lines: Vec<String> = Vec::new();
         let mut reader = BufReader::new(stderr);
         let mut line = String::new();
         loop {
@@ -404,15 +545,31 @@ async fn run_ffmpeg_inner(
             match tokio::io::AsyncBufReadExt::read_line(&mut reader, &mut line).await {
                 Ok(0) => break,
                 Ok(_) => {
-                    // Only keep the last ~2KB of stderr
-                    if buf.len() < 2048 {
-                        buf.push_str(&line);
+                    let trimmed = line.trim().to_string();
+                    if !trimmed.is_empty() {
+                        // Capture lines containing actual errors
+                        let lower = trimmed.to_lowercase();
+                        if lower.contains("error")
+                            || lower.contains("invalid")
+                            || lower.contains("no such")
+                            || lower.contains("unknown")
+                            || lower.contains("unsupported")
+                            || lower.contains("cannot")
+                            || lower.contains("conversion failed")
+                        {
+                            error_lines.push(trimmed.clone());
+                        }
+                        // Rolling tail: keep last 10 lines
+                        tail_lines.push(trimmed);
+                        if tail_lines.len() > 10 {
+                            tail_lines.remove(0);
+                        }
                     }
                 }
                 Err(_) => break,
             }
         }
-        buf
+        (error_lines, tail_lines)
     });
 
     let mut progress_builder = ProgressBuilder::default();
@@ -477,20 +634,17 @@ async fn run_ffmpeg_inner(
     if status.success() {
         FfmpegResult::Success
     } else {
-        let stderr_output = stderr_handle.await.unwrap_or_default();
-        let last_lines: String = stderr_output
-            .lines()
-            .rev()
-            .take(5)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect::<Vec<_>>()
-            .join("\n");
+        let (error_lines, tail_lines) = stderr_handle.await.unwrap_or_default();
+        // Prefer specific error lines; fall back to tail of stderr
+        let detail = if !error_lines.is_empty() {
+            error_lines.join("\n")
+        } else {
+            tail_lines.join("\n")
+        };
         FfmpegResult::Failed(format!(
-            "ffmpeg exited with code {}: {}",
+            "ffmpeg exited with code {}:\n{}",
             status.code().unwrap_or(-1),
-            last_lines
+            detail
         ))
     }
 }
@@ -547,7 +701,10 @@ impl ProgressBuilder {
             }
             "total_size" => self.total_size = value.parse().unwrap_or(0),
             "out_time_us" | "out_time_ms" => {
-                self.out_time_us = value.parse().unwrap_or(0);
+                let v = value.parse().unwrap_or(0);
+                if v > 0 {
+                    self.out_time_us = v;
+                }
             }
             "speed" => {
                 // "2.34x" or "N/A"
@@ -657,15 +814,16 @@ async fn get_duration(path: &Path) -> Result<f64, String> {
 }
 
 async fn check_integrity(path: &Path) -> Result<bool, String> {
+    // Only check the video stream — copied audio may have pre-existing
+    // non-fatal warnings (e.g. AAC env_facs_q) that aren't encode failures
     let output = Command::new("ffmpeg")
         .args(["-v", "error", "-i"])
         .arg(path)
-        .args(["-f", "null", "-"])
+        .args(["-map", "0:v", "-f", "null", "-"])
         .output()
         .await
         .map_err(|e| format!("ffmpeg integrity check failed: {}", e))?;
 
-    // Empty stderr means no errors
     Ok(output.stderr.is_empty())
 }
 

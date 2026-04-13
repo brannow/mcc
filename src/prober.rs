@@ -47,6 +47,8 @@ struct FfprobeTags {
     number_of_frames: Option<String>,
     #[serde(rename = "NUMBER_OF_FRAMES-eng")]
     number_of_frames_eng: Option<String>,
+    #[serde(alias = "DURATION")]
+    duration: Option<String>,
 }
 
 #[derive(Debug)]
@@ -85,6 +87,20 @@ fn parse_frame_count(stream: &FfprobeStream) -> Option<u64> {
                 .and_then(|t| t.number_of_frames.as_deref())
                 .and_then(|v| v.parse().ok())
         })
+        // Fallback: estimate from duration * fps
+        .or_else(|| {
+            let fps = stream.r_frame_rate.as_deref().and_then(parse_frame_rate)?;
+            let dur = stream
+                .tags
+                .as_ref()
+                .and_then(|t| t.duration.as_deref())
+                .and_then(parse_duration_tag)?;
+            if fps > 0.0 && dur > 0.0 {
+                Some((dur * fps).round() as u64)
+            } else {
+                None
+            }
+        })
 }
 
 fn parse_bitrate(stream: &FfprobeStream) -> Option<u64> {
@@ -107,6 +123,19 @@ fn parse_bitrate(stream: &FfprobeStream) -> Option<u64> {
                 .and_then(|t| t.bps_eng.as_deref())
                 .and_then(|b| b.parse().ok())
         })
+}
+
+/// Parse "HH:MM:SS.microseconds" duration tag into seconds.
+fn parse_duration_tag(tag: &str) -> Option<f64> {
+    let parts: Vec<&str> = tag.split(':').collect();
+    if parts.len() == 3 {
+        let h: f64 = parts[0].parse().ok()?;
+        let m: f64 = parts[1].parse().ok()?;
+        let s: f64 = parts[2].parse().ok()?;
+        Some(h * 3600.0 + m * 60.0 + s)
+    } else {
+        tag.parse().ok()
+    }
 }
 
 fn parse_frame_rate(rate: &str) -> Option<f64> {
