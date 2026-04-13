@@ -17,7 +17,7 @@ Rust TUI for batch media file discovery, inspection (`ffprobe`), and HEVC encodi
 ### Docker
 
 ```bash
-docker run -it -v /path/to/media:/media ghcr.io/OWNER/mcc
+docker run -it -v /path/to/media:/media ghcr.io/brannow/mcc
 ```
 
 ### Binary
@@ -33,7 +33,7 @@ mcc /path/to/media
 Pre-built multi-arch images (`linux/amd64`, `linux/arm64`):
 
 ```bash
-docker pull ghcr.io/OWNER/mcc:latest
+docker pull ghcr.io/brannow/mcc:latest
 ```
 
 ### From Source
