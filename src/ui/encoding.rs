@@ -454,24 +454,22 @@ fn render_detail(f: &mut Frame, app: &App, area: Rect, active: bool) {
 
     // ── FPS graph (right side) ──
     if let Some(graph_area) = graph_area {
-        render_fps_graph(f, &job.fps_stats, graph_area);
+        render_fps_graph(f, &job.fps_stats, &job.fps_stats.history, graph_area);
     }
 }
 
 fn render_job_summary(f: &mut Frame, job: &crate::model::EncodeJob, area: Rect) {
     let stats = &job.fps_stats;
     let show_graph =
-        matches!(job.status, EncodeJobStatus::Done { .. }) && !stats.history.is_empty();
+        matches!(job.status, EncodeJobStatus::Done { .. }) && !stats.full_history.is_empty();
 
-    let stats_min_width: u16 = 48;
-    let graph_min_width: u16 = 15;
-    let (stats_area, graph_area) = if show_graph && area.width > stats_min_width + graph_min_width {
+    // For Done jobs: text on top, graph below (full width).
+    // For Failed jobs: text takes full area (no graph).
+    let text_lines = count_summary_lines(job);
+    let (text_area, graph_area) = if show_graph && area.height > (text_lines + 4) as u16 {
         let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(stats_min_width),
-                Constraint::Min(graph_min_width),
-            ])
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(text_lines as u16), Constraint::Min(4)])
             .split(area);
         (chunks[0], Some(chunks[1]))
     } else {
@@ -518,7 +516,6 @@ fn render_job_summary(f: &mut Frame, job: &crate::model::EncodeJob, area: Rect) 
             encoded_size,
             saved_percent,
         } => {
-            lines.push(Line::from(""));
             lines.push(Line::from(vec![
                 Span::styled("  Size:    ", Style::default().fg(theme::LABEL)),
                 Span::styled(
@@ -529,38 +526,76 @@ fn render_job_summary(f: &mut Frame, job: &crate::model::EncodeJob, area: Rect) 
                     format!("  ({:.0}% saved)", saved_percent),
                     Style::default().fg(theme::CODEC_HEVC),
                 ),
-            ]));
-            if stats.avg > 0.0 {
-                lines.push(Line::from(vec![
-                    Span::styled("  FPS:     ", Style::default().fg(theme::LABEL)),
+                if stats.avg > 0.0 {
                     Span::styled(
                         format!(
-                            "min:{:.0}  max:{:.0}  avg:{:.0}",
+                            "    FPS min:{:.0}  max:{:.0}  avg:{:.0}",
                             stats.min, stats.max, stats.avg
                         ),
-                        Style::default().fg(theme::TEXT),
-                    ),
-                ]));
-            }
-            if let Some(secs) = job.elapsed_secs {
-                lines.push(Line::from(vec![
-                    Span::styled("  Time:    ", Style::default().fg(theme::LABEL)),
-                    Span::styled(human_duration(secs), Style::default().fg(theme::TEXT)),
-                ]));
-            }
+                        Style::default().fg(theme::TEXT_DIM),
+                    )
+                } else {
+                    Span::raw("")
+                },
+                if let Some(secs) = job.elapsed_secs {
+                    Span::styled(
+                        format!("    Time: {}", human_duration(secs)),
+                        Style::default().fg(theme::TEXT_DIM),
+                    )
+                } else {
+                    Span::raw("")
+                },
+            ]));
         }
         _ => {}
     }
 
-    f.render_widget(Paragraph::new(lines), stats_area);
+    f.render_widget(Paragraph::new(lines), text_area);
 
-    // FPS graph for completed jobs
+    // FPS graph for completed jobs — full width, downsampled to fit
     if let Some(graph_area) = graph_area {
-        render_fps_graph(f, stats, graph_area);
+        let graph_dots = (graph_area.width.saturating_sub(5) as usize) * 2;
+        let compressed = downsample(&stats.full_history, graph_dots);
+        render_fps_graph(f, stats, &compressed, graph_area);
     }
 }
 
-fn render_fps_graph(f: &mut Frame, stats: &crate::model::FpsStats, graph_area: Rect) {
+fn count_summary_lines(job: &crate::model::EncodeJob) -> usize {
+    let mut count = 3; // file, preset, status
+    match &job.status {
+        EncodeJobStatus::Failed(reason) => {
+            count += 2 + reason.lines().count(); // blank + "Error:" + lines
+        }
+        EncodeJobStatus::Done { .. } => {
+            count += 1; // size/fps/time line
+        }
+        _ => {}
+    }
+    count
+}
+
+/// Compress a sample series into `target_len` points by averaging buckets.
+fn downsample(data: &[f64], target_len: usize) -> Vec<f64> {
+    if data.len() <= target_len || target_len == 0 {
+        return data.to_vec();
+    }
+    let bucket_size = data.len() as f64 / target_len as f64;
+    (0..target_len)
+        .map(|i| {
+            let start = (i as f64 * bucket_size) as usize;
+            let end = (((i + 1) as f64) * bucket_size) as usize;
+            let slice = &data[start..end.min(data.len())];
+            slice.iter().sum::<f64>() / slice.len() as f64
+        })
+        .collect()
+}
+
+fn render_fps_graph(
+    f: &mut Frame,
+    stats: &crate::model::FpsStats,
+    history: &[f64],
+    graph_area: Rect,
+) {
     let padded = Rect {
         x: graph_area.x + 2,
         y: graph_area.y,
@@ -575,7 +610,11 @@ fn render_fps_graph(f: &mut Frame, stats: &crate::model::FpsStats, graph_area: R
     }
 
     let graph_data_h = graph_h.saturating_sub(3);
-    let braille_rows = stats.braille_graph(graph_w.saturating_sub(2), graph_data_h);
+    let braille_rows = crate::model::FpsStats::braille_graph_from(
+        history,
+        graph_w.saturating_sub(2),
+        graph_data_h,
+    );
 
     let max_label = format!("{:.0}", stats.max);
     let min_label = format!("{:.0}", stats.min);

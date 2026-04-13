@@ -196,6 +196,7 @@ pub struct FpsStats {
     pub max: f64,
     pub avg: f64,
     pub history: Vec<f64>,
+    pub full_history: Vec<f64>,
     sample_count: u64,
     sample_sum: f64,
     ticks_since_sample: u64,
@@ -230,24 +231,25 @@ impl FpsStats {
                 self.history.remove(0);
             }
             self.history.push(fps);
+            self.full_history.push(fps);
         }
     }
 
     /// Render a braille dot graph for the given `width` (in terminal columns)
     /// and `height` (in terminal rows). Each braille character is a 2x4 dot grid,
     /// so we get `width * 2` horizontal points and `height * 4` vertical levels.
-    pub fn braille_graph(&self, width: usize, height: usize) -> Vec<String> {
+    pub fn braille_graph_from(data: &[f64], width: usize, height: usize) -> Vec<String> {
         let dots_x = width * 2;
         let dots_y = height * 4;
 
-        if self.history.is_empty() || dots_x == 0 || dots_y == 0 {
+        if data.is_empty() || dots_x == 0 || dots_y == 0 {
             return vec![String::new(); height];
         }
 
         // Take the last dots_x samples (or pad left with None)
-        let sample_count = self.history.len().min(dots_x);
-        let offset = self.history.len().saturating_sub(dots_x);
-        let samples = &self.history[offset..];
+        let sample_count = data.len().min(dots_x);
+        let offset = data.len().saturating_sub(dots_x);
+        let samples = &data[offset..];
 
         let lo = samples.iter().copied().fold(f64::INFINITY, f64::min);
         let hi = samples.iter().copied().fold(f64::NEG_INFINITY, f64::max);
