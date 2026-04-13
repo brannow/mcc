@@ -1,0 +1,16 @@
+# Rust
+/target
+
+# macOS
+.DS_Store
+._*
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo

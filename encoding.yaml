@@ -1,0 +1,70 @@
+temp_dir: /tmp/encoding  # global default, overridable per preset
+probe_concurrency: 8     # max parallel ffprobe processes
+media_extensions:       # file types to scan (defaults below)
+  - mkv
+  - mp4
+  - avi
+  - m4v
+  - webm
+  - mov
+  - wmv
+  - flv
+  - ts
+  - mpg
+  - mpeg
+skip_codecs:              # never re-encode files already in these codecs
+  - hevc
+  - av1
+
+presets:
+  anime:
+    target_format: mkv
+    target_codec: hevc
+    # temp_dir: /tmp/anime  # optional per-preset override
+    ffmpeg_args:
+      - -tune
+      - animation
+      - -pix_fmt
+      - yuv420p10le
+      - -crf
+      - "24"
+      - -preset
+      - medium
+      - -map
+      - "0"
+      - -c
+      - copy
+      - -c:v
+      - libx265
+      - -x265-params
+      - profile=main10
+
+  movies:
+    target_format: mkv
+    target_codec: hevc
+    ffmpeg_args:
+      - -crf
+      - "20"
+      - -preset
+      - medium
+      - -map
+      - "0"
+      - -c
+      - copy
+      - -c:v
+      - libx265
+
+  series:
+    target_format: mkv
+    target_codec: hevc
+    ffmpeg_args:
+      - -crf
+      - "20"
+      - -preset
+      - medium
+      - -map
+      - "0"
+      - -c
+      - copy
+      - -c:v
+      - libx265
