@@ -316,7 +316,7 @@ pub fn render_preset_picker(
         .unwrap_or(10);
     // "  1  > name    summary   [default] "
     let content_width = (6 + max_name_len + 2 + max_summary_len + 12) as u16;
-    let content_width = content_width.max(40).min(70);
+    let content_width = content_width.clamp(40, 70);
     // 2 (border) + 1 (hint line) + 1 (blank) + presets + 1 (blank) + 1 (context hint)
     let content_height = (2 + 1 + 1 + presets.len() + 1 + 1) as u16;
 

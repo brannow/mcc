@@ -534,72 +534,72 @@ impl App {
     }
 
     pub fn handle_event(&mut self) -> std::io::Result<()> {
-        if event::poll(std::time::Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind != KeyEventKind::Press {
-                    return Ok(());
+        if event::poll(std::time::Duration::from_millis(50))?
+            && let Event::Key(key) = event::read()?
+        {
+            if key.kind != KeyEventKind::Press {
+                return Ok(());
+            }
+            if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                if self.is_encoding_active() || self.queued_count() > 0 {
+                    self.show_quit_confirm = true;
+                } else {
+                    self.should_quit = true;
                 }
-                if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
-                    if self.is_encoding_active() || self.queued_count() > 0 {
-                        self.show_quit_confirm = true;
-                    } else {
+                return Ok(());
+            }
+
+            // Quit confirm dialog intercepts all input
+            if self.show_quit_confirm {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Enter => {
                         self.should_quit = true;
                     }
+                    _ => {
+                        self.show_quit_confirm = false;
+                    }
+                }
+                return Ok(());
+            }
+
+            // Dialog intercepts all input when open
+            if let Some(dialog) = &mut self.cleanup_dialog {
+                let action = dialog.handle_key(key.code);
+                match action {
+                    CleanupAction::Close => {
+                        self.cleanup_dialog = None;
+                    }
+                    CleanupAction::Delete => {
+                        self.execute_cleanup();
+                    }
+                    CleanupAction::None => {}
+                }
+                return Ok(());
+            }
+
+            // Preset picker intercepts all input when open
+            if self.preset_picker.is_some() {
+                self.handle_preset_picker_key(key.code);
+                return Ok(());
+            }
+
+            // Global keys (available in all views)
+            match key.code {
+                KeyCode::Left => {
+                    self.active_view = ActiveView::List;
                     return Ok(());
                 }
-
-                // Quit confirm dialog intercepts all input
-                if self.show_quit_confirm {
-                    match key.code {
-                        KeyCode::Char('y') | KeyCode::Enter => {
-                            self.should_quit = true;
-                        }
-                        _ => {
-                            self.show_quit_confirm = false;
-                        }
-                    }
+                KeyCode::Right => {
+                    self.active_view = ActiveView::Encoding;
                     return Ok(());
                 }
+                _ => {}
+            }
 
-                // Dialog intercepts all input when open
-                if let Some(dialog) = &mut self.cleanup_dialog {
-                    let action = dialog.handle_key(key.code);
-                    match action {
-                        CleanupAction::Close => {
-                            self.cleanup_dialog = None;
-                        }
-                        CleanupAction::Delete => {
-                            self.execute_cleanup();
-                        }
-                        CleanupAction::None => {}
-                    }
-                    return Ok(());
-                }
-
-                // Preset picker intercepts all input when open
-                if self.preset_picker.is_some() {
-                    self.handle_preset_picker_key(key.code);
-                    return Ok(());
-                }
-
-                // Global keys (available in all views)
-                match key.code {
-                    KeyCode::Left => {
-                        self.active_view = ActiveView::List;
-                        return Ok(());
-                    }
-                    KeyCode::Right => {
-                        self.active_view = ActiveView::Encoding;
-                        return Ok(());
-                    }
-                    _ => {}
-                }
-
-                // View-specific input
-                match self.active_view {
-                    ActiveView::List => self.handle_list_event(key),
-                    ActiveView::Encoding => self.handle_encoding_event(key),
-                }
+            // View-specific input
+            match self.active_view {
+                ActiveView::List => self.handle_list_event(key),
+                ActiveView::Encoding => self.handle_encoding_event(key),
             }
         }
         Ok(())
@@ -1186,15 +1186,15 @@ impl App {
                                 ref final_path,
                             } => {
                                 // Update the MediaFile to reflect new codec/size/path
-                                if let Some(fi) = file_index {
-                                    if let Some(file) = self.files.get_mut(fi) {
-                                        file.file_size = encoded_size;
-                                        file.path = final_path.clone();
-                                        if let Some(vs) = file.video_streams.first_mut() {
-                                            vs.codec = "hevc".to_string();
-                                            vs.codec_long = None;
-                                            vs.bitrate = None; // unknown until re-probed
-                                        }
+                                if let Some(fi) = file_index
+                                    && let Some(file) = self.files.get_mut(fi)
+                                {
+                                    file.file_size = encoded_size;
+                                    file.path = final_path.clone();
+                                    if let Some(vs) = file.video_streams.first_mut() {
+                                        vs.codec = "hevc".to_string();
+                                        vs.codec_long = None;
+                                        vs.bitrate = None; // unknown until re-probed
                                     }
                                 }
                                 // Update queue entry so the size column reflects the encoded size
@@ -1429,14 +1429,13 @@ impl App {
         self.selected_preset = preset_index;
 
         // In encoding view: update the selected queue item's preset (if it's still queued)
-        if self.active_view == ActiveView::Encoding && !self.encode_queue.is_empty() {
-            if let Some(job) = self.encode_queue.get_mut(self.encode_queue_selected) {
-                if matches!(job.status, EncodeJobStatus::Queued) {
-                    if let Some(preset) = self.presets.get(preset_index) {
-                        job.preset_name = preset.name.clone();
-                    }
-                }
-            }
+        if self.active_view == ActiveView::Encoding
+            && !self.encode_queue.is_empty()
+            && let Some(job) = self.encode_queue.get_mut(self.encode_queue_selected)
+            && matches!(job.status, EncodeJobStatus::Queued)
+            && let Some(preset) = self.presets.get(preset_index)
+        {
+            job.preset_name = preset.name.clone();
         }
     }
 
@@ -1450,10 +1449,10 @@ impl App {
             Some(p) => p.name.clone(),
             None => return,
         };
-        if let Some(job) = self.encode_queue.get_mut(self.encode_queue_selected) {
-            if matches!(job.status, EncodeJobStatus::Queued) {
-                job.preset_name = preset_name;
-            }
+        if let Some(job) = self.encode_queue.get_mut(self.encode_queue_selected)
+            && matches!(job.status, EncodeJobStatus::Queued)
+        {
+            job.preset_name = preset_name;
         }
         // Advance to next row
         let len = self.encode_queue.len();
@@ -1559,16 +1558,16 @@ impl App {
 
     /// Remove a job from the queue by queue index. Only removable if Queued/Done/Failed/Cancelled.
     pub fn remove_from_queue(&mut self, queue_index: usize) -> bool {
-        if let Some(job) = self.encode_queue.get(queue_index) {
-            if job.status.is_removable() {
-                self.encode_queue.remove(queue_index);
-                if self.encode_queue_selected >= self.encode_queue.len()
-                    && self.encode_queue_selected > 0
-                {
-                    self.encode_queue_selected -= 1;
-                }
-                return true;
+        if let Some(job) = self.encode_queue.get(queue_index)
+            && job.status.is_removable()
+        {
+            self.encode_queue.remove(queue_index);
+            if self.encode_queue_selected >= self.encode_queue.len()
+                && self.encode_queue_selected > 0
+            {
+                self.encode_queue_selected -= 1;
             }
+            return true;
         }
         false
     }

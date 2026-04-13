@@ -222,14 +222,14 @@ pub fn apply_probe_result(file: &mut MediaFile, data: ProbeData) {
     file.subtitle_streams = data.subtitle_streams;
 
     // Fallback bitrate for primary video stream: format-level, then calculated from file size
-    if let Some(vs) = file.video_streams.first_mut() {
-        if vs.bitrate.is_none() {
-            vs.bitrate = data.format_bitrate.or_else(|| {
-                data.duration_secs
-                    .filter(|&d| d > 0.0)
-                    .map(|d| (file.file_size * 8) / d as u64)
-            });
-        }
+    if let Some(vs) = file.video_streams.first_mut()
+        && vs.bitrate.is_none()
+    {
+        vs.bitrate = data.format_bitrate.or_else(|| {
+            data.duration_secs
+                .filter(|&d| d > 0.0)
+                .map(|d| (file.file_size * 8) / d as u64)
+        });
     }
 }
 

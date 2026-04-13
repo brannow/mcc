@@ -56,22 +56,22 @@ impl EncodingPreset {
         let args = &self.ffmpeg_args;
         let mut parts = Vec::new();
 
-        if let Some(i) = args.iter().position(|a| a == "-crf") {
-            if let Some(val) = args.get(i + 1) {
-                parts.push(format!("CRF {}", val));
-            }
+        if let Some(i) = args.iter().position(|a| a == "-crf")
+            && let Some(val) = args.get(i + 1)
+        {
+            parts.push(format!("CRF {}", val));
         }
 
-        if let Some(i) = args.iter().position(|a| a == "-preset") {
-            if let Some(val) = args.get(i + 1) {
-                parts.push(val.clone());
-            }
+        if let Some(i) = args.iter().position(|a| a == "-preset")
+            && let Some(val) = args.get(i + 1)
+        {
+            parts.push(val.clone());
         }
 
-        if let Some(i) = args.iter().position(|a| a == "-c:v") {
-            if let Some(val) = args.get(i + 1) {
-                parts.push(val.clone());
-            }
+        if let Some(i) = args.iter().position(|a| a == "-c:v")
+            && let Some(val) = args.get(i + 1)
+        {
+            parts.push(val.clone());
         }
 
         if parts.is_empty() {

@@ -258,11 +258,11 @@ async fn encode_one(
                 final_path
             };
 
-            if final_path != hevc_copy_path {
-                if let Err(e) = tokio::fs::rename(&hevc_copy_path, &final_path).await {
-                    // Non-fatal: file is encoded, just couldn't rename
-                    eprintln!("Warning: rename failed: {}", e);
-                }
+            if final_path != hevc_copy_path
+                && let Err(e) = tokio::fs::rename(&hevc_copy_path, &final_path).await
+            {
+                // Non-fatal: file is encoded, just couldn't rename
+                eprintln!("Warning: rename failed: {}", e);
             }
 
             let encoded_size = match tokio::fs::metadata(&final_path).await {
