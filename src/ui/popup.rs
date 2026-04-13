@@ -1,13 +1,13 @@
+use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
-use ratatui::Frame;
 
+use super::theme;
 use crate::app::{ActiveView, App, CleanupDialog, CleanupFocus, PresetPicker};
 use crate::model::human_file_size;
 use crate::preset::EncodingPreset;
-use super::theme;
 
 pub fn render_legend_popup(f: &mut Frame, _app: &App) {
     let area = f.area();
@@ -16,48 +16,65 @@ pub fn render_legend_popup(f: &mut Frame, _app: &App) {
     let popup = centered_fixed(56, 18, area);
     f.render_widget(Clear, popup);
 
-    let key = Style::default().fg(theme::ACCENT).bg(theme::POPUP_BG).add_modifier(Modifier::BOLD);
+    let key = Style::default()
+        .fg(theme::ACCENT)
+        .bg(theme::POPUP_BG)
+        .add_modifier(Modifier::BOLD);
     let desc = Style::default().fg(theme::TEXT).bg(theme::POPUP_BG);
     let dim = Style::default().fg(theme::TEXT_DIM).bg(theme::POPUP_BG);
-    let head = Style::default().fg(theme::TEXT_BRIGHT).bg(theme::POPUP_BG).add_modifier(Modifier::BOLD);
+    let head = Style::default()
+        .fg(theme::TEXT_BRIGHT)
+        .bg(theme::POPUP_BG)
+        .add_modifier(Modifier::BOLD);
 
     let lines = vec![
         Line::from(""),
         Line::from(Span::styled("  Encoding Control", head)),
         Line::from(vec![
-            Span::styled("    Enter  ", key), Span::styled("Start encoding queue", desc),
+            Span::styled("    Enter  ", key),
+            Span::styled("Start encoding queue", desc),
         ]),
         Line::from(vec![
-            Span::styled("    Space  ", key), Span::styled("Pause / Resume current", desc),
+            Span::styled("    Space  ", key),
+            Span::styled("Pause / Resume current", desc),
         ]),
         Line::from(vec![
-            Span::styled("    c      ", key), Span::styled("Cancel current encode", desc),
+            Span::styled("    c      ", key),
+            Span::styled("Cancel current encode", desc),
         ]),
         Line::from(vec![
-            Span::styled("    C      ", key), Span::styled("Cancel all (kill current + drop queue)", desc),
+            Span::styled("    C      ", key),
+            Span::styled("Cancel all (kill current + drop queue)", desc),
         ]),
         Line::from(vec![
-            Span::styled("    s      ", key), Span::styled("Stop queue (let current finish)", desc),
+            Span::styled("    s      ", key),
+            Span::styled("Stop queue (let current finish)", desc),
         ]),
         Line::from(""),
         Line::from(Span::styled("  Queue Management", head)),
         Line::from(vec![
-            Span::styled("    x/Del  ", key), Span::styled("Remove selected job", desc),
+            Span::styled("    x/Del  ", key),
+            Span::styled("Remove selected job", desc),
         ]),
         Line::from(vec![
-            Span::styled("    \u{2191}/\u{2193}    ", key), Span::styled("Navigate queue", desc),
+            Span::styled("    \u{2191}/\u{2193}    ", key),
+            Span::styled("Navigate queue", desc),
         ]),
         Line::from(vec![
-            Span::styled("    p      ", key), Span::styled("Select preset", desc),
+            Span::styled("    p      ", key),
+            Span::styled("Select preset", desc),
         ]),
         Line::from(vec![
-            Span::styled("    P      ", key), Span::styled("Stamp preset + advance", desc),
+            Span::styled("    P      ", key),
+            Span::styled("Stamp preset + advance", desc),
         ]),
         Line::from(vec![
-            Span::styled("    Tab    ", key), Span::styled("Switch pane focus", desc),
+            Span::styled("    Tab    ", key),
+            Span::styled("Switch pane focus", desc),
         ]),
         Line::from(vec![
-            Span::styled("    \u{2190}      ", key), Span::styled("Back to list view", desc),
+            Span::styled("    \u{2190}      ", key),
+            Span::styled("Back to list view", desc),
         ]),
     ];
 
@@ -66,11 +83,15 @@ pub fn render_legend_popup(f: &mut Frame, _app: &App) {
         .border_style(Style::default().fg(theme::ACCENT).bg(theme::POPUP_BG))
         .title(Span::styled(
             " Keybindings ",
-            Style::default().fg(theme::ACCENT).bg(theme::POPUP_BG).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(theme::ACCENT)
+                .bg(theme::POPUP_BG)
+                .add_modifier(Modifier::BOLD),
         ))
-        .title_bottom(Line::from(vec![
-            Span::styled(" press any key to close ", dim),
-        ]))
+        .title_bottom(Line::from(vec![Span::styled(
+            " press any key to close ",
+            dim,
+        )]))
         .style(Style::default().bg(theme::POPUP_BG));
 
     let paragraph = Paragraph::new(lines).block(block);
@@ -150,13 +171,13 @@ pub fn render_cleanup_dialog(f: &mut Frame, dialog: &CleanupDialog) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),                                // description
-            Constraint::Length(1),                                // blank
-            Constraint::Length(dialog.groups.len() as u16),       // checkbox list
-            Constraint::Length(1),                                // blank
-            Constraint::Length(1),                                // status
-            Constraint::Length(1),                                // blank
-            Constraint::Length(1),                                // buttons
+            Constraint::Length(1),                          // description
+            Constraint::Length(1),                          // blank
+            Constraint::Length(dialog.groups.len() as u16), // checkbox list
+            Constraint::Length(1),                          // blank
+            Constraint::Length(1),                          // status
+            Constraint::Length(1),                          // blank
+            Constraint::Length(1),                          // buttons
         ])
         .split(inner);
 
@@ -177,20 +198,31 @@ pub fn render_cleanup_dialog(f: &mut Frame, dialog: &CleanupDialog) {
         let line = Line::from(vec![
             Span::styled(
                 format!("  {} ", cursor_indicator),
-                Style::default().fg(if is_cursor { theme::ACCENT } else { theme::TEXT_DIM }),
+                Style::default().fg(if is_cursor {
+                    theme::ACCENT
+                } else {
+                    theme::TEXT_DIM
+                }),
             ),
             Span::styled(
                 format!("{} ", checkbox),
-                Style::default().fg(if group.selected { theme::CODEC_HEVC } else { theme::TEXT_DIM }),
+                Style::default().fg(if group.selected {
+                    theme::CODEC_HEVC
+                } else {
+                    theme::TEXT_DIM
+                }),
             ),
             Span::styled(
                 group.label(),
-                Style::default().fg(if is_cursor { theme::TEXT_BRIGHT } else { theme::TEXT }),
+                Style::default().fg(if is_cursor {
+                    theme::TEXT_BRIGHT
+                } else {
+                    theme::TEXT
+                }),
             ),
         ]);
         list_lines.push(line);
     }
-
 
     f.render_widget(Paragraph::new(list_lines), chunks[2]);
 
@@ -239,8 +271,7 @@ pub fn render_cleanup_dialog(f: &mut Frame, dialog: &CleanupDialog) {
             .bg(delete_focused_bg)
             .add_modifier(Modifier::BOLD)
     } else {
-        Style::default()
-            .fg(theme::CODEC_ERROR)
+        Style::default().fg(theme::CODEC_ERROR)
     };
 
     let cancel_style = if dialog.focus == CleanupFocus::CancelButton {
@@ -253,11 +284,15 @@ pub fn render_cleanup_dialog(f: &mut Frame, dialog: &CleanupDialog) {
     };
 
     f.render_widget(
-        Paragraph::new(Line::from(" [ Delete ] ")).style(delete_style).alignment(Alignment::Center),
+        Paragraph::new(Line::from(" [ Delete ] "))
+            .style(delete_style)
+            .alignment(Alignment::Center),
         btn_layout[1],
     );
     f.render_widget(
-        Paragraph::new(Line::from(" [ Cancel ] ")).style(cancel_style).alignment(Alignment::Center),
+        Paragraph::new(Line::from(" [ Cancel ] "))
+            .style(cancel_style)
+            .alignment(Alignment::Center),
         btn_layout[3],
     );
 }
@@ -274,7 +309,11 @@ pub fn render_preset_picker(
 
     // Calculate dimensions based on content
     let max_name_len = presets.iter().map(|p| p.name.len()).max().unwrap_or(10);
-    let max_summary_len = presets.iter().map(|p| p.summary().len()).max().unwrap_or(10);
+    let max_summary_len = presets
+        .iter()
+        .map(|p| p.summary().len())
+        .max()
+        .unwrap_or(10);
     // "  1  > name    summary   [default] "
     let content_width = (6 + max_name_len + 2 + max_summary_len + 12) as u16;
     let content_width = content_width.max(40).min(70);
@@ -319,9 +358,9 @@ pub fn render_preset_picker(
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),                       // context hint
-            Constraint::Length(1),                       // blank
-            Constraint::Length(presets.len() as u16),    // preset list
+            Constraint::Length(1),                    // context hint
+            Constraint::Length(1),                    // blank
+            Constraint::Length(presets.len() as u16), // preset list
         ])
         .split(inner);
 
@@ -346,28 +385,36 @@ pub fn render_preset_picker(
         let number = format!("{}", i + 1);
         let default_tag = if is_default { " [default]" } else { "" };
 
-        let name_color = if is_cursor { theme::TEXT_BRIGHT } else { theme::TEXT };
-        let summary_color = if is_cursor { theme::TEXT } else { theme::TEXT_DIM };
+        let name_color = if is_cursor {
+            theme::TEXT_BRIGHT
+        } else {
+            theme::TEXT
+        };
+        let summary_color = if is_cursor {
+            theme::TEXT
+        } else {
+            theme::TEXT_DIM
+        };
 
         let line = Line::from(vec![
             Span::styled(
                 format!("  {} ", cursor_char),
-                Style::default().fg(if is_cursor { theme::ACCENT } else { theme::TEXT_DIM }),
+                Style::default().fg(if is_cursor {
+                    theme::ACCENT
+                } else {
+                    theme::TEXT_DIM
+                }),
             ),
-            Span::styled(
-                format!("{} ", number),
-                Style::default().fg(theme::TEXT_DIM),
-            ),
+            Span::styled(format!("{} ", number), Style::default().fg(theme::TEXT_DIM)),
             Span::styled(
                 format!("{:<width$}", preset.name, width = max_name_len + 2),
-                Style::default().fg(name_color).add_modifier(
-                    if is_cursor { Modifier::BOLD } else { Modifier::empty() }
-                ),
+                Style::default().fg(name_color).add_modifier(if is_cursor {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
             ),
-            Span::styled(
-                preset.summary(),
-                Style::default().fg(summary_color),
-            ),
+            Span::styled(preset.summary(), Style::default().fg(summary_color)),
             Span::styled(
                 default_tag.to_string(),
                 Style::default().fg(theme::CODEC_HEVC),
@@ -391,9 +438,17 @@ pub fn render_quit_confirm(f: &mut Frame, app: &App) {
         desc_parts.push("encoding in progress".to_string());
     }
     if queued > 0 {
-        desc_parts.push(format!("{} queued job{}", queued, if queued == 1 { "" } else { "s" }));
+        desc_parts.push(format!(
+            "{} queued job{}",
+            queued,
+            if queued == 1 { "" } else { "s" }
+        ));
     }
-    let line1 = format!("  {} still {}.", if encoding { "Encoding" } else { "Queue" }, desc_parts.join(" and "));
+    let line1 = format!(
+        "  {} still {}.",
+        if encoding { "Encoding" } else { "Queue" },
+        desc_parts.join(" and ")
+    );
     let line2 = "  Quitting will cancel and clean up temp files.";
 
     let content_width = line1.len().max(line2.len()) as u16 + 4; // +4 for borders + padding
@@ -401,9 +456,15 @@ pub fn render_quit_confirm(f: &mut Frame, app: &App) {
     let popup = centered_fixed(content_width, 7, area);
     f.render_widget(Clear, popup);
 
-    let warn = Style::default().fg(theme::CODEC_ERROR).bg(theme::POPUP_BG).add_modifier(Modifier::BOLD);
+    let warn = Style::default()
+        .fg(theme::CODEC_ERROR)
+        .bg(theme::POPUP_BG)
+        .add_modifier(Modifier::BOLD);
     let text = Style::default().fg(theme::TEXT).bg(theme::POPUP_BG);
-    let key = Style::default().fg(theme::ACCENT).bg(theme::POPUP_BG).add_modifier(Modifier::BOLD);
+    let key = Style::default()
+        .fg(theme::ACCENT)
+        .bg(theme::POPUP_BG)
+        .add_modifier(Modifier::BOLD);
     let dim = Style::default().fg(theme::TEXT_DIM).bg(theme::POPUP_BG);
 
     let lines = vec![

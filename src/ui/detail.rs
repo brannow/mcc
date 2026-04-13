@@ -1,12 +1,14 @@
 use std::path::Path;
 
+use ratatui::Frame;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
-use ratatui::Frame;
 
-use crate::model::{human_bitrate, human_duration, human_file_size, FolderRow, MediaFile, ProbeStatus};
 use super::theme;
+use crate::model::{
+    FolderRow, MediaFile, ProbeStatus, human_bitrate, human_duration, human_file_size,
+};
 
 pub enum DetailPayload {
     File(MediaFile),
@@ -39,7 +41,10 @@ fn codec_value(codec: &str) -> Line<'static> {
             format!("  {:<16}", "Codec:"),
             Style::default().fg(theme::LABEL),
         ),
-        Span::styled(codec.to_string(), Style::default().fg(color).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            codec.to_string(),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        ),
     ])
 }
 
@@ -58,14 +63,20 @@ pub fn render_detail(
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(if active { theme::border_active_style() } else { theme::border_style() })
+        .border_style(if active {
+            theme::border_active_style()
+        } else {
+            theme::border_style()
+        })
         .title(Span::styled(" Detail ", theme::title_style()));
 
     let inner_height = area.height.saturating_sub(2);
     let max_scroll = (lines.len() as u16).saturating_sub(inner_height);
     let clamped_scroll = scroll.min(max_scroll);
 
-    let detail = Paragraph::new(lines).block(block).scroll((clamped_scroll, 0));
+    let detail = Paragraph::new(lines)
+        .block(block)
+        .scroll((clamped_scroll, 0));
     f.render_widget(detail, area);
 }
 
@@ -80,7 +91,10 @@ fn build_folder_lines(folder: &FolderRow, root_path: &Path) -> Vec<Line<'static>
 
     lines.push(section_header(" FOLDER"));
     lines.push(label_value("Path:", format!("{}/", relative_path)));
-    lines.push(label_value("Total size:", human_file_size(folder.recursive_size)));
+    lines.push(label_value(
+        "Total size:",
+        human_file_size(folder.recursive_size),
+    ));
     lines.push(label_value("Media files:", folder.file_count.to_string()));
     lines
 }
@@ -88,7 +102,9 @@ fn build_folder_lines(folder: &FolderRow, root_path: &Path) -> Vec<Line<'static>
 fn build_file_lines(file: &MediaFile, root_path: &Path) -> Vec<Line<'static>> {
     let mut lines: Vec<Line> = Vec::new();
 
-    let relative_path = file.path.strip_prefix(root_path)
+    let relative_path = file
+        .path
+        .strip_prefix(root_path)
         .unwrap_or(&file.path)
         .to_string_lossy()
         .to_string();
@@ -127,7 +143,10 @@ fn build_file_lines(file: &MediaFile, root_path: &Path) -> Vec<Line<'static>> {
                     lines.push(label_value("Decoder:", long.clone()));
                 }
                 if vs.width > 0 {
-                    lines.push(label_value("Resolution:", format!("{}x{}", vs.width, vs.height)));
+                    lines.push(label_value(
+                        "Resolution:",
+                        format!("{}x{}", vs.width, vs.height),
+                    ));
                 }
                 if let Some(br) = vs.bitrate {
                     lines.push(label_value("Bitrate:", human_bitrate(br)));
@@ -151,7 +170,10 @@ fn build_file_lines(file: &MediaFile, root_path: &Path) -> Vec<Line<'static>> {
                     lines.push(label_value("Decoder:", long.clone()));
                 }
                 lines.push(label_value("Channels:", audio.channels.to_string()));
-                lines.push(label_value("Sample Rate:", format!("{} Hz", audio.sample_rate)));
+                lines.push(label_value(
+                    "Sample Rate:",
+                    format!("{} Hz", audio.sample_rate),
+                ));
                 if let Some(br) = audio.bitrate {
                     lines.push(label_value("Bitrate:", human_bitrate(br)));
                 }

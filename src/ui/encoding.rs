@@ -1,12 +1,12 @@
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table};
-use ratatui::Frame;
 
+use super::theme;
 use crate::app::{App, EncodingPaneFocus};
 use crate::model::{EncodeJobStatus, human_duration, human_file_size};
-use super::theme;
 
 pub fn render_encoding_view(f: &mut Frame, app: &mut App, area: Rect) {
     if app.is_encoding_active() {
@@ -41,7 +41,11 @@ fn render_queue_table(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
         .iter()
         .enumerate()
         .map(|(idx, job)| {
-            let row_bg = if idx % 2 == 0 { theme::BG } else { theme::BG_ALT };
+            let row_bg = if idx % 2 == 0 {
+                theme::BG
+            } else {
+                theme::BG_ALT
+            };
 
             let num_cell = Cell::from(Span::styled(
                 format!(" {}", idx + 1),
@@ -85,7 +89,10 @@ fn render_queue_table(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
             let status_cell = Cell::from(Span::styled(
                 status_content,
                 Style::default().fg(status_color).add_modifier(
-                    if matches!(job.status, EncodeJobStatus::Encoding | EncodeJobStatus::CopyingToTemp) {
+                    if matches!(
+                        job.status,
+                        EncodeJobStatus::Encoding | EncodeJobStatus::CopyingToTemp
+                    ) {
                         Modifier::BOLD
                     } else {
                         Modifier::empty()
@@ -93,8 +100,14 @@ fn render_queue_table(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
                 ),
             ));
 
-            Row::new(vec![num_cell, name_cell, size_cell, preset_cell, status_cell])
-                .style(Style::default().bg(row_bg))
+            Row::new(vec![
+                num_cell,
+                name_cell,
+                size_cell,
+                preset_cell,
+                status_cell,
+            ])
+            .style(Style::default().bg(row_bg))
         })
         .collect();
 
@@ -105,30 +118,45 @@ fn render_queue_table(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
     let title = Line::from(vec![
         Span::styled(" Encoding Queue ", theme::title_style()),
         Span::styled("─ ", Style::default().fg(theme::BORDER)),
-        Span::styled(format!("{}", total), Style::default().fg(theme::TEXT_BRIGHT)),
+        Span::styled(
+            format!("{}", total),
+            Style::default().fg(theme::TEXT_BRIGHT),
+        ),
         Span::styled(" jobs ", Style::default().fg(theme::TEXT_DIM)),
         if queued > 0 {
-            Span::styled(format!("({} queued) ", queued), Style::default().fg(theme::ACCENT))
+            Span::styled(
+                format!("({} queued) ", queued),
+                Style::default().fg(theme::ACCENT),
+            )
         } else if finished > 0 {
-            Span::styled(format!("({} done) ", finished), Style::default().fg(theme::CODEC_HEVC))
+            Span::styled(
+                format!("({} done) ", finished),
+                Style::default().fg(theme::CODEC_HEVC),
+            )
         } else {
             Span::raw("")
         },
     ]);
 
     let preset_info = if let Some(preset) = app.current_preset() {
-        Line::from(vec![
-            Span::styled(format!(" [{}] ", preset.name), Style::default().fg(theme::ACCENT)),
-        ])
+        Line::from(vec![Span::styled(
+            format!(" [{}] ", preset.name),
+            Style::default().fg(theme::ACCENT),
+        )])
     } else {
-        Line::from(vec![
-            Span::styled(" [no presets] ", Style::default().fg(theme::CODEC_ERROR)),
-        ])
+        Line::from(vec![Span::styled(
+            " [no presets] ",
+            Style::default().fg(theme::CODEC_ERROR),
+        )])
     };
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(if active { theme::border_active_style() } else { theme::border_style() })
+        .border_style(if active {
+            theme::border_active_style()
+        } else {
+            theme::border_style()
+        })
         .title(title)
         .title_bottom(preset_info);
 
@@ -146,16 +174,23 @@ fn render_queue_table(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
         .row_highlight_style(theme::selected_style())
         .column_spacing(1);
 
-    app.encode_queue_state.select(
-        if app.encode_queue.is_empty() { None } else { Some(app.encode_queue_selected) }
-    );
+    app.encode_queue_state
+        .select(if app.encode_queue.is_empty() {
+            None
+        } else {
+            Some(app.encode_queue_selected)
+        });
     f.render_stateful_widget(table, area, &mut app.encode_queue_state);
 }
 
 fn render_telemetry(f: &mut Frame, app: &App, area: Rect, active: bool) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(if active { theme::border_active_style() } else { theme::border_style() })
+        .border_style(if active {
+            theme::border_active_style()
+        } else {
+            theme::border_style()
+        })
         .title(Span::styled(" Current Encoding ", theme::title_style()));
 
     let inner = block.inner(area);
@@ -219,12 +254,19 @@ fn render_telemetry(f: &mut Frame, app: &App, area: Rect, active: bool) {
             Span::styled("  Status:  ", Style::default().fg(theme::LABEL)),
             Span::styled(
                 job.status.label(),
-                Style::default().fg(status_display(&job.status).1).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(status_display(&job.status).1)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
     ];
 
-    if job.progress.is_none() && matches!(job.status, EncodeJobStatus::Encoding | EncodeJobStatus::CopyingToTemp) {
+    if job.progress.is_none()
+        && matches!(
+            job.status,
+            EncodeJobStatus::Encoding | EncodeJobStatus::CopyingToTemp
+        )
+    {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "  Waiting for ffmpeg...",
@@ -247,10 +289,21 @@ fn render_telemetry(f: &mut Frame, app: &App, area: Rect, active: bool) {
         lines.push(Line::from(vec![
             Span::styled("  ", Style::default()),
             Span::styled("[", Style::default().fg(theme::TEXT_DIM)),
-            Span::styled("\u{25b0}".repeat(filled), Style::default().fg(theme::PROGRESS_DONE)),
-            Span::styled("\u{25b1}".repeat(empty), Style::default().fg(theme::PROGRESS_REMAINING)),
+            Span::styled(
+                "\u{25b0}".repeat(filled),
+                Style::default().fg(theme::PROGRESS_DONE),
+            ),
+            Span::styled(
+                "\u{25b1}".repeat(empty),
+                Style::default().fg(theme::PROGRESS_REMAINING),
+            ),
             Span::styled("] ", Style::default().fg(theme::TEXT_DIM)),
-            Span::styled(format!("{:.1}%", percent), Style::default().fg(theme::TEXT_BRIGHT).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{:.1}%", percent),
+                Style::default()
+                    .fg(theme::TEXT_BRIGHT)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]));
 
         let frame_str = if let Some(total) = job.total_frames {
@@ -264,24 +317,39 @@ fn render_telemetry(f: &mut Frame, app: &App, area: Rect, active: bool) {
             Span::styled("  Frame:   ", Style::default().fg(theme::LABEL)),
             Span::styled(frame_str, Style::default().fg(theme::TEXT)),
             Span::styled("  Size: ", Style::default().fg(theme::LABEL)),
-            Span::styled(human_file_size(progress.total_size), Style::default().fg(theme::TEXT)),
+            Span::styled(
+                human_file_size(progress.total_size),
+                Style::default().fg(theme::TEXT),
+            ),
         ]));
 
         lines.push(Line::from(vec![
             Span::styled("  FPS:     ", Style::default().fg(theme::LABEL)),
-            Span::styled(format!("{:.1}", stats.current), Style::default().fg(theme::TEXT_BRIGHT)),
+            Span::styled(
+                format!("{:.1}", stats.current),
+                Style::default().fg(theme::TEXT_BRIGHT),
+            ),
             Span::styled("  min:", Style::default().fg(theme::TEXT_DIM)),
-            Span::styled(format!("{:.1}", stats.min), Style::default().fg(theme::TEXT)),
+            Span::styled(
+                format!("{:.1}", stats.min),
+                Style::default().fg(theme::TEXT),
+            ),
             Span::styled("  max:", Style::default().fg(theme::TEXT_DIM)),
-            Span::styled(format!("{:.1}", stats.max), Style::default().fg(theme::TEXT)),
+            Span::styled(
+                format!("{:.1}", stats.max),
+                Style::default().fg(theme::TEXT),
+            ),
             Span::styled("  avg:", Style::default().fg(theme::TEXT_DIM)),
-            Span::styled(format!("{:.1}", stats.avg), Style::default().fg(theme::TEXT)),
+            Span::styled(
+                format!("{:.1}", stats.avg),
+                Style::default().fg(theme::TEXT),
+            ),
         ]));
 
         // ETA + elapsed time
-        let elapsed_str = job.started_at.map(|t| {
-            human_duration(t.elapsed().as_secs_f64())
-        });
+        let elapsed_str = job
+            .started_at
+            .map(|t| human_duration(t.elapsed().as_secs_f64()));
 
         if stats.avg > 0.0 {
             if let Some(total) = job.total_frames.filter(|&t| t > 0) {
@@ -291,11 +359,20 @@ fn render_telemetry(f: &mut Frame, app: &App, area: Rect, active: bool) {
                 let eta_s = (remaining_secs as u64) % 60;
                 let mut spans = vec![
                     Span::styled("  ETA:     ", Style::default().fg(theme::LABEL)),
-                    Span::styled(format!("~{}m {:02}s", eta_m, eta_s), Style::default().fg(theme::TEXT)),
+                    Span::styled(
+                        format!("~{}m {:02}s", eta_m, eta_s),
+                        Style::default().fg(theme::TEXT),
+                    ),
                 ];
                 if let Some(ref elapsed) = elapsed_str {
-                    spans.push(Span::styled("  elapsed: ", Style::default().fg(theme::TEXT_DIM)));
-                    spans.push(Span::styled(elapsed.clone(), Style::default().fg(theme::TEXT)));
+                    spans.push(Span::styled(
+                        "  elapsed: ",
+                        Style::default().fg(theme::TEXT_DIM),
+                    ));
+                    spans.push(Span::styled(
+                        elapsed.clone(),
+                        Style::default().fg(theme::TEXT),
+                    ));
                 }
                 lines.push(Line::from(spans));
             }
@@ -324,7 +401,9 @@ fn render_telemetry(f: &mut Frame, app: &App, area: Rect, active: bool) {
         if graph_h >= 4 && graph_w >= 5 {
             // Layout: title (1) + top border (1) + graph + bottom border (1)
             let graph_data_h = graph_h.saturating_sub(3);
-            let braille_rows = job.fps_stats.braille_graph(graph_w.saturating_sub(2), graph_data_h);
+            let braille_rows = job
+                .fps_stats
+                .braille_graph(graph_w.saturating_sub(2), graph_data_h);
 
             let stats = &job.fps_stats;
             let mut graph_lines: Vec<Line> = Vec::new();
@@ -340,12 +419,10 @@ fn render_telemetry(f: &mut Frame, app: &App, area: Rect, active: bool) {
 
             // Top border with max value
             let top_border_w = graph_w.saturating_sub(max_label.len() + 2);
-            graph_lines.push(Line::from(vec![
-                Span::styled(
-                    format!("{} \u{250c}{}", max_label, "\u{2500}".repeat(top_border_w)),
-                    Style::default().fg(theme::BORDER),
-                ),
-            ]));
+            graph_lines.push(Line::from(vec![Span::styled(
+                format!("{} \u{250c}{}", max_label, "\u{2500}".repeat(top_border_w)),
+                Style::default().fg(theme::BORDER),
+            )]));
 
             // Graph rows with left border
             for row_str in &braille_rows {
@@ -354,21 +431,16 @@ fn render_telemetry(f: &mut Frame, app: &App, area: Rect, active: bool) {
                         format!("{:>width$} \u{2502}", "", width = max_label.len()),
                         Style::default().fg(theme::BORDER),
                     ),
-                    Span::styled(
-                        row_str.clone(),
-                        Style::default().fg(theme::ACCENT),
-                    ),
+                    Span::styled(row_str.clone(), Style::default().fg(theme::ACCENT)),
                 ]));
             }
 
             // Bottom border with min value
             let bot_border_w = graph_w.saturating_sub(min_label.len() + 2);
-            graph_lines.push(Line::from(vec![
-                Span::styled(
-                    format!("{} \u{2514}{}", min_label, "\u{2500}".repeat(bot_border_w)),
-                    Style::default().fg(theme::BORDER),
-                ),
-            ]));
+            graph_lines.push(Line::from(vec![Span::styled(
+                format!("{} \u{2514}{}", min_label, "\u{2500}".repeat(bot_border_w)),
+                Style::default().fg(theme::BORDER),
+            )]));
 
             f.render_widget(Paragraph::new(graph_lines), padded);
         }

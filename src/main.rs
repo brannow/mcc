@@ -15,11 +15,14 @@ use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
-use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
 
 #[derive(Parser)]
-#[command(name = "mcc", about = "Media Control Center - inspect your media library")]
+#[command(
+    name = "mcc",
+    about = "Media Control Center - inspect your media library"
+)]
 struct Cli {
     /// Root directory to scan for media files
     path: PathBuf,

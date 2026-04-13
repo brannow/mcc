@@ -162,7 +162,10 @@ impl EncodeJobStatus {
     }
 
     pub fn is_removable(&self) -> bool {
-        matches!(self, Self::Queued | Self::Done { .. } | Self::Failed(_) | Self::Cancelled)
+        matches!(
+            self,
+            Self::Queued | Self::Done { .. } | Self::Failed(_) | Self::Cancelled
+        )
     }
 }
 
@@ -208,8 +211,12 @@ impl FpsStats {
             self.min = fps;
             self.max = fps;
         } else {
-            if fps < self.min { self.min = fps; }
-            if fps > self.max { self.max = fps; }
+            if fps < self.min {
+                self.min = fps;
+            }
+            if fps > self.max {
+                self.max = fps;
+            }
         }
         self.sample_count += 1;
         self.sample_sum += fps;
@@ -247,10 +254,13 @@ impl FpsStats {
         let range = if (hi - lo) < 0.01 { 1.0 } else { hi - lo };
 
         // Map each sample to a dot row (0 = bottom, dots_y-1 = top)
-        let dot_rows: Vec<usize> = samples.iter().map(|&v| {
-            let normalized = (v - lo) / range;
-            (normalized * (dots_y - 1) as f64).round() as usize
-        }).collect();
+        let dot_rows: Vec<usize> = samples
+            .iter()
+            .map(|&v| {
+                let normalized = (v - lo) / range;
+                (normalized * (dots_y - 1) as f64).round() as usize
+            })
+            .collect();
 
         // Build a 2D grid of braille dots: grid[char_row][char_col] stores
         // which of the 8 dots in that braille char are set.
@@ -282,11 +292,13 @@ impl FpsStats {
         }
 
         // Convert grid to braille strings
-        grid.iter().map(|row| {
-            row.iter().map(|&bits| {
-                char::from_u32(0x2800 + bits as u32).unwrap_or(' ')
-            }).collect()
-        }).collect()
+        grid.iter()
+            .map(|row| {
+                row.iter()
+                    .map(|&bits| char::from_u32(0x2800 + bits as u32).unwrap_or(' '))
+                    .collect()
+            })
+            .collect()
     }
 }
 
@@ -330,7 +342,11 @@ impl fmt::Display for VideoStream {
 
 impl fmt::Display for AudioStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {}ch {}Hz", self.codec, self.channels, self.sample_rate)?;
+        write!(
+            f,
+            "{} {}ch {}Hz",
+            self.codec, self.channels, self.sample_rate
+        )?;
         if let Some(lang) = &self.language {
             write!(f, " [{}]", lang)?;
         }

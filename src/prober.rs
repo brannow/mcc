@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use serde::Deserialize;
+use std::path::PathBuf;
 use tokio::process::Command;
 use tokio::sync::mpsc;
 
@@ -67,16 +67,46 @@ pub struct ProbeData {
 
 fn parse_frame_count(stream: &FfprobeStream) -> Option<u64> {
     // Try nb_frames field first, then NUMBER_OF_FRAMES-eng, then NUMBER_OF_FRAMES from tags
-    stream.nb_frames.as_deref().and_then(|v| v.parse().ok())
-        .or_else(|| stream.tags.as_ref().and_then(|t| t.number_of_frames_eng.as_deref()).and_then(|v| v.parse().ok()))
-        .or_else(|| stream.tags.as_ref().and_then(|t| t.number_of_frames.as_deref()).and_then(|v| v.parse().ok()))
+    stream
+        .nb_frames
+        .as_deref()
+        .and_then(|v| v.parse().ok())
+        .or_else(|| {
+            stream
+                .tags
+                .as_ref()
+                .and_then(|t| t.number_of_frames_eng.as_deref())
+                .and_then(|v| v.parse().ok())
+        })
+        .or_else(|| {
+            stream
+                .tags
+                .as_ref()
+                .and_then(|t| t.number_of_frames.as_deref())
+                .and_then(|v| v.parse().ok())
+        })
 }
 
 fn parse_bitrate(stream: &FfprobeStream) -> Option<u64> {
     // Try bit_rate field first, then tags.BPS, then tags.BPS-eng
-    stream.bit_rate.as_deref().and_then(|b| b.parse().ok())
-        .or_else(|| stream.tags.as_ref().and_then(|t| t.bps.as_deref()).and_then(|b| b.parse().ok()))
-        .or_else(|| stream.tags.as_ref().and_then(|t| t.bps_eng.as_deref()).and_then(|b| b.parse().ok()))
+    stream
+        .bit_rate
+        .as_deref()
+        .and_then(|b| b.parse().ok())
+        .or_else(|| {
+            stream
+                .tags
+                .as_ref()
+                .and_then(|t| t.bps.as_deref())
+                .and_then(|b| b.parse().ok())
+        })
+        .or_else(|| {
+            stream
+                .tags
+                .as_ref()
+                .and_then(|t| t.bps_eng.as_deref())
+                .and_then(|b| b.parse().ok())
+        })
 }
 
 fn parse_frame_rate(rate: &str) -> Option<f64> {
@@ -94,8 +124,10 @@ fn parse_frame_rate(rate: &str) -> Option<f64> {
 async fn probe_file(path: &PathBuf) -> Result<ProbeData, String> {
     let output = Command::new("ffprobe")
         .args([
-            "-v", "quiet",
-            "-print_format", "json",
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
             "-show_format",
             "-show_streams",
         ])
@@ -205,7 +237,10 @@ pub fn apply_probe_result(file: &mut MediaFile, data: ProbeData) {
 /// Send file paths via the returned sender, results come back on the receiver.
 pub fn start_background_prober(
     concurrency: usize,
-) -> (mpsc::UnboundedSender<PathBuf>, mpsc::UnboundedReceiver<ProbeResult>) {
+) -> (
+    mpsc::UnboundedSender<PathBuf>,
+    mpsc::UnboundedReceiver<ProbeResult>,
+) {
     let (path_tx, mut path_rx) = mpsc::unbounded_channel::<PathBuf>();
     let (result_tx, result_rx) = mpsc::unbounded_channel::<ProbeResult>();
 

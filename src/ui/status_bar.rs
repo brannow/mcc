@@ -1,11 +1,11 @@
-use ratatui::layout::{Constraint, Direction, Layout, Alignment};
+use ratatui::Frame;
+use ratatui::layout::{Alignment, Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 
-use crate::app::{ActiveView, App};
 use super::theme;
+use crate::app::{ActiveView, App};
 
 pub fn render_status_bar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     // Split into: progress bar (if scanning) | stats | keybindings
@@ -15,7 +15,7 @@ pub fn render_status_bar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) 
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(22),  // progress bar
+                Constraint::Length(22), // progress bar
                 Constraint::Min(20),    // stats
                 Constraint::Length(55), // keybindings
             ])
@@ -32,11 +32,20 @@ pub fn render_status_bar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) 
         let empty = bar_width.saturating_sub(filled);
         let bar_line = Line::from(vec![
             Span::styled(" [", Style::default().fg(theme::TEXT_DIM)),
-            Span::styled("▰".repeat(filled), Style::default().fg(theme::PROGRESS_DONE)),
-            Span::styled("▱".repeat(empty), Style::default().fg(theme::PROGRESS_REMAINING)),
+            Span::styled(
+                "▰".repeat(filled),
+                Style::default().fg(theme::PROGRESS_DONE),
+            ),
+            Span::styled(
+                "▱".repeat(empty),
+                Style::default().fg(theme::PROGRESS_REMAINING),
+            ),
             Span::styled("] ", Style::default().fg(theme::TEXT_DIM)),
         ]);
-        f.render_widget(Paragraph::new(bar_line).style(Style::default().bg(theme::STATUS_BG)), chunks[0]);
+        f.render_widget(
+            Paragraph::new(bar_line).style(Style::default().bg(theme::STATUS_BG)),
+            chunks[0],
+        );
 
         // Stats
         render_stats(f, app, chunks[1]);
@@ -62,13 +71,31 @@ fn render_stats(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
 
     let stats = Line::from(vec![
         Span::styled(" h264:", Style::default().fg(theme::TEXT_DIM)),
-        Span::styled(format!("{}", h264), Style::default().fg(theme::CODEC_H264).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{}", h264),
+            Style::default()
+                .fg(theme::CODEC_H264)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled("  hevc:", Style::default().fg(theme::TEXT_DIM)),
-        Span::styled(format!("{}", hevc), Style::default().fg(theme::CODEC_HEVC).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{}", hevc),
+            Style::default()
+                .fg(theme::CODEC_HEVC)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled("  av1:", Style::default().fg(theme::TEXT_DIM)),
-        Span::styled(format!("{}", av1), Style::default().fg(theme::CODEC_AV1).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{}", av1),
+            Style::default()
+                .fg(theme::CODEC_AV1)
+                .add_modifier(Modifier::BOLD),
+        ),
         if other > 0 {
-            Span::styled(format!("  other:{}", other), Style::default().fg(theme::TEXT_DIM))
+            Span::styled(
+                format!("  other:{}", other),
+                Style::default().fg(theme::TEXT_DIM),
+            )
         } else {
             Span::raw("")
         },
@@ -87,9 +114,15 @@ fn render_stats(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         // Mini encoding indicator (visible from any view)
         if app.is_encoding_active() {
             if app.is_encoding_paused() {
-                Span::styled("  ENC:PAUSED", Style::default().fg(theme::CODEC_H264).add_modifier(Modifier::BOLD))
+                Span::styled(
+                    "  ENC:PAUSED",
+                    Style::default()
+                        .fg(theme::CODEC_H264)
+                        .add_modifier(Modifier::BOLD),
+                )
             } else {
-                let pct = app.current_encoding_job()
+                let pct = app
+                    .current_encoding_job()
                     .and_then(|j| {
                         let progress = j.progress.as_ref()?;
                         let p = if let Some(total) = j.total_frames.filter(|&t| t > 0) {
@@ -100,7 +133,12 @@ fn render_stats(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
                         Some(format!("{:.0}%", p))
                     })
                     .unwrap_or_else(|| "...".to_string());
-                Span::styled(format!("  ENC:{}", pct), Style::default().fg(theme::ACCENT).add_modifier(Modifier::BOLD))
+                Span::styled(
+                    format!("  ENC:{}", pct),
+                    Style::default()
+                        .fg(theme::ACCENT)
+                        .add_modifier(Modifier::BOLD),
+                )
             }
         } else if app.queued_count() > 0 {
             Span::styled(
@@ -158,7 +196,7 @@ fn render_keybindings(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             keys.push(("\u{2190}", "List"));
             keys.push(("^C", "Quit"));
             keys
-        },
+        }
     };
     // Only show as many as fit
     let available = area.width as usize;

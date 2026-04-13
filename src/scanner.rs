@@ -54,7 +54,10 @@ pub enum ScanItem {
 /// Dropping `tx` when done signals scan completion to the receiver.
 /// Spawns the scanner on a blocking thread and returns a receiver that
 /// emits each discovered item. The channel closes when scanning finishes.
-pub fn start_background_scan(root: PathBuf, extensions: Vec<String>) -> mpsc::UnboundedReceiver<ScanItem> {
+pub fn start_background_scan(
+    root: PathBuf,
+    extensions: Vec<String>,
+) -> mpsc::UnboundedReceiver<ScanItem> {
     let (tx, rx) = mpsc::unbounded_channel();
     tokio::task::spawn_blocking(move || scan_streaming(root, tx, &extensions));
     rx
@@ -102,11 +105,13 @@ pub fn scan_streaming(root: PathBuf, tx: mpsc::UnboundedSender<ScanItem>, extens
 
         let file_size = entry.metadata().map(|m| m.len()).unwrap_or(0);
         if tx
-            .send(ScanItem::Media(MediaFile::new(path.to_path_buf(), file_size)))
+            .send(ScanItem::Media(MediaFile::new(
+                path.to_path_buf(),
+                file_size,
+            )))
             .is_err()
         {
             return;
         }
     }
 }
-

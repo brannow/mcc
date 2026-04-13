@@ -5,10 +5,10 @@ pub mod popup;
 pub mod status_bar;
 pub mod theme;
 
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::Style;
 use ratatui::widgets::{Block, Widget};
-use ratatui::Frame;
 
 use crate::app::{ActiveView, App, ListRow};
 
@@ -36,7 +36,13 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popup::render_cleanup_dialog(f, dialog);
     }
     if let Some(picker) = &app.preset_picker {
-        popup::render_preset_picker(f, picker, &app.presets, app.selected_preset, app.active_view);
+        popup::render_preset_picker(
+            f,
+            picker,
+            &app.presets,
+            app.selected_preset,
+            app.active_view,
+        );
     }
     if app.show_legend {
         popup::render_legend_popup(f, app);
@@ -51,11 +57,7 @@ fn render_list_view(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
         // Snapshot the selected row so the immutable borrow ends before rendering the list
         let selected_row = app.selected_row();
         let detail_payload: Option<detail::DetailPayload> = match selected_row {
-            Some(ListRow::Media(i)) => app
-                .files
-                .get(i)
-                .cloned()
-                .map(detail::DetailPayload::File),
+            Some(ListRow::Media(i)) => app.files.get(i).cloned().map(detail::DetailPayload::File),
             Some(ListRow::Folder(i)) => app
                 .folders
                 .get(i)

@@ -55,7 +55,11 @@ pub enum EncodeStatus {
 
 #[derive(Debug)]
 pub enum EncodeResult {
-    Success { encoded_size: u64, saved_percent: f64, final_path: PathBuf },
+    Success {
+        encoded_size: u64,
+        saved_percent: f64,
+        final_path: PathBuf,
+    },
     Failed(String),
     Cancelled,
 }
@@ -90,12 +94,7 @@ async fn encoder_loop(
     event_tx: mpsc::UnboundedSender<EncodeEvent>,
 ) {
     while let Some(request) = request_rx.recv().await {
-        let result = encode_one(
-            &request,
-            &mut control_rx,
-            &event_tx,
-        )
-        .await;
+        let result = encode_one(&request, &mut control_rx, &event_tx).await;
 
         let _ = event_tx.send(EncodeEvent::Completed {
             job_id: request.job_id,
@@ -249,8 +248,7 @@ async fn encode_one(
 
             // Rename: strip encoding hints and remove _hevc_ prefix
             let final_name = remove_encoding_hints(original_stem);
-            let final_path =
-                original_dir.join(format!("{}.{}", final_name, preset.target_format));
+            let final_path = original_dir.join(format!("{}.{}", final_name, preset.target_format));
 
             // Avoid overwriting if final path already exists (shouldn't happen, but safe)
             let final_path = if final_path.exists() && final_path != request.source_path {
@@ -308,7 +306,16 @@ async fn run_ffmpeg(
     control_rx: &mut mpsc::UnboundedReceiver<EncodeControl>,
     event_tx: &mpsc::UnboundedSender<EncodeEvent>,
 ) -> FfmpegResult {
-    run_ffmpeg_inner(job_id, input, output, &preset.ffmpeg_args, duration_secs, control_rx, event_tx).await
+    run_ffmpeg_inner(
+        job_id,
+        input,
+        output,
+        &preset.ffmpeg_args,
+        duration_secs,
+        control_rx,
+        event_tx,
+    )
+    .await
 }
 
 async fn run_ffmpeg_with_subtitle_fallback(
@@ -340,7 +347,16 @@ async fn run_ffmpeg_with_subtitle_fallback(
         status: EncodeStatus::Encoding,
     });
 
-    run_ffmpeg_inner(job_id, input, output, &modified_args, duration_secs, control_rx, event_tx).await
+    run_ffmpeg_inner(
+        job_id,
+        input,
+        output,
+        &modified_args,
+        duration_secs,
+        control_rx,
+        event_tx,
+    )
+    .await
 }
 
 async fn run_ffmpeg_inner(
@@ -527,10 +543,7 @@ impl ProgressBuilder {
             "fps" => self.fps = value.parse().unwrap_or(0.0),
             "bitrate" => {
                 // "1234.5kbits/s" or "N/A"
-                self.bitrate_kbps = value
-                    .trim_end_matches("kbits/s")
-                    .parse()
-                    .unwrap_or(0.0);
+                self.bitrate_kbps = value.trim_end_matches("kbits/s").parse().unwrap_or(0.0);
             }
             "total_size" => self.total_size = value.parse().unwrap_or(0),
             "out_time_us" | "out_time_ms" => {
@@ -603,25 +616,34 @@ async fn validate_encoded(
 async fn get_video_codec(path: &Path) -> Result<String, String> {
     let output = Command::new("ffprobe")
         .args([
-            "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=codec_name",
-            "-of", "default=noprint_wrappers=1:nokey=1",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=codec_name",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
         ])
         .arg(path)
         .output()
         .await
         .map_err(|e| format!("ffprobe failed: {}", e))?;
 
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_lowercase())
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .to_lowercase())
 }
 
 async fn get_duration(path: &Path) -> Result<f64, String> {
     let output = Command::new("ffprobe")
         .args([
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
         ])
         .arg(path)
         .output()
@@ -655,8 +677,8 @@ pub fn remove_encoding_hints(stem: &str) -> String {
     let mut result = stem.to_string();
 
     let hints = [
-        "h264", "H264", "h.264", "H.264", "h_264", "H_264", "h 264", "H 264",
-        "xvid", "Xvid", "XVid", "XVId", "XVID", "XviD",
+        "h264", "H264", "h.264", "H.264", "h_264", "H_264", "h 264", "H 264", "xvid", "Xvid",
+        "XVid", "XVId", "XVID", "XviD",
     ];
 
     // Apply 3 times like the PHP version (handles nested artifacts)
@@ -680,7 +702,9 @@ pub fn remove_encoding_hints(stem: &str) -> String {
     }
 
     // Trim trailing dots and underscores
-    result = result.trim_matches(|c| c == '.' || c == '_' || c == ' ').to_string();
+    result = result
+        .trim_matches(|c| c == '.' || c == '_' || c == ' ')
+        .to_string();
 
     if result.is_empty() {
         stem.to_string() // safety: don't produce empty filename

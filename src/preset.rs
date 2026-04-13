@@ -95,7 +95,10 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             probe_concurrency: DEFAULT_PROBE_CONCURRENCY,
-            media_extensions: DEFAULT_MEDIA_EXTENSIONS.iter().map(|s| s.to_string()).collect(),
+            media_extensions: DEFAULT_MEDIA_EXTENSIONS
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             skip_codecs: DEFAULT_SKIP_CODECS.iter().map(|s| s.to_string()).collect(),
             presets: Vec::new(),
         }
@@ -124,10 +127,9 @@ pub fn load_presets(dir: &Path) -> AppConfig {
 }
 
 fn load_config_file(path: &Path) -> Result<AppConfig, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("read error: {}", e))?;
-    let config: RawConfig = serde_yaml::from_str(&content)
-        .map_err(|e| format!("parse error: {}", e))?;
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read error: {}", e))?;
+    let config: RawConfig =
+        serde_yaml::from_str(&content).map_err(|e| format!("parse error: {}", e))?;
 
     let global_temp = config.temp_dir.unwrap_or_else(std::env::temp_dir);
 
@@ -142,7 +144,9 @@ fn load_config_file(path: &Path) -> Result<AppConfig, String> {
             Some(EncodingPreset {
                 name: key,
                 target_format: entry.target_format,
-                target_codec: entry.target_codec.unwrap_or_else(|| DEFAULT_TARGET_CODEC.to_string()),
+                target_codec: entry
+                    .target_codec
+                    .unwrap_or_else(|| DEFAULT_TARGET_CODEC.to_string()),
                 temp_dir: entry.temp_dir.unwrap_or_else(|| global_temp.clone()),
                 ffmpeg_args: entry.ffmpeg_args,
             })
@@ -152,13 +156,18 @@ fn load_config_file(path: &Path) -> Result<AppConfig, String> {
     presets.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 
     Ok(AppConfig {
-        probe_concurrency: config.probe_concurrency.unwrap_or(DEFAULT_PROBE_CONCURRENCY),
+        probe_concurrency: config
+            .probe_concurrency
+            .unwrap_or(DEFAULT_PROBE_CONCURRENCY),
         media_extensions: config.media_extensions.unwrap_or_else(|| {
-            DEFAULT_MEDIA_EXTENSIONS.iter().map(|s| s.to_string()).collect()
+            DEFAULT_MEDIA_EXTENSIONS
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
         }),
-        skip_codecs: config.skip_codecs.unwrap_or_else(|| {
-            DEFAULT_SKIP_CODECS.iter().map(|s| s.to_string()).collect()
-        }),
+        skip_codecs: config
+            .skip_codecs
+            .unwrap_or_else(|| DEFAULT_SKIP_CODECS.iter().map(|s| s.to_string()).collect()),
         presets,
     })
 }
@@ -175,9 +184,12 @@ mod tests {
             target_codec: "hevc".to_string(),
             temp_dir: PathBuf::from("/tmp"),
             ffmpeg_args: vec![
-                "-crf".into(), "20".into(),
-                "-preset".into(), "medium".into(),
-                "-c:v".into(), "libx265".into(),
+                "-crf".into(),
+                "20".into(),
+                "-preset".into(),
+                "medium".into(),
+                "-c:v".into(),
+                "libx265".into(),
             ],
         };
         assert_eq!(preset.summary(), "CRF 20, medium, libx265");
@@ -187,14 +199,29 @@ mod tests {
     fn test_load_encoding_yaml() {
         let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let config = load_presets(&project_root);
-        assert!(!config.presets.is_empty(), "Should load at least one preset");
+        assert!(
+            !config.presets.is_empty(),
+            "Should load at least one preset"
+        );
 
         for preset in &config.presets {
             assert!(!preset.name.is_empty(), "Preset name must not be empty");
-            assert!(!preset.target_format.is_empty(), "target_format must not be empty");
-            assert!(!preset.target_codec.is_empty(), "target_codec must not be empty");
-            assert!(!preset.ffmpeg_args.is_empty(), "ffmpeg_args must not be empty");
-            assert!(preset.temp_dir.as_os_str().len() > 0, "temp_dir must be resolved");
+            assert!(
+                !preset.target_format.is_empty(),
+                "target_format must not be empty"
+            );
+            assert!(
+                !preset.target_codec.is_empty(),
+                "target_codec must not be empty"
+            );
+            assert!(
+                !preset.ffmpeg_args.is_empty(),
+                "ffmpeg_args must not be empty"
+            );
+            assert!(
+                preset.temp_dir.as_os_str().len() > 0,
+                "temp_dir must be resolved"
+            );
         }
 
         // Presets should be sorted by name

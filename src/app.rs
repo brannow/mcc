@@ -1,11 +1,15 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::widgets::TableState;
+use std::collections::HashMap;
+use std::path::PathBuf;
 use tokio::sync::mpsc;
 
-use crate::encoder::{self, EncodeControl, EncodeEvent, EncodeRequest, EncodeResult, EncodeStatus, EncoderHandle};
-use crate::model::{EncodeJob, EncodeJobStatus, FolderRow, FpsStats, MediaFile, ProbeStatus, human_file_size};
+use crate::encoder::{
+    self, EncodeControl, EncodeEvent, EncodeRequest, EncodeResult, EncodeStatus, EncoderHandle,
+};
+use crate::model::{
+    EncodeJob, EncodeJobStatus, FolderRow, FpsStats, MediaFile, ProbeStatus, human_file_size,
+};
 use crate::preset::{AppConfig, EncodingPreset};
 use crate::prober::{self, ProbeResult, apply_probe_result};
 use crate::scanner::{self, JunkFile, JunkType, ScanItem};
@@ -28,7 +32,11 @@ pub enum ListRow {
     Folder(usize),
 }
 
-fn row_path<'a>(files: &'a [MediaFile], folders: &'a [FolderRow], row: &ListRow) -> &'a std::path::Path {
+fn row_path<'a>(
+    files: &'a [MediaFile],
+    folders: &'a [FolderRow],
+    row: &ListRow,
+) -> &'a std::path::Path {
     match *row {
         ListRow::Media(i) => files[i].path.as_path(),
         ListRow::Folder(i) => folders[i].path.as_path(),
@@ -70,9 +78,7 @@ fn cmp_files_by(files: &[MediaFile], a: usize, b: usize, col: SortColumn) -> std
                 .unwrap_or(0);
             ra.cmp(&rb)
         }
-        SortColumn::Bitrate => files[a]
-            .primary_bitrate()
-            .cmp(&files[b].primary_bitrate()),
+        SortColumn::Bitrate => files[a].primary_bitrate().cmp(&files[b].primary_bitrate()),
         SortColumn::Duration => files[a]
             .duration_secs
             .partial_cmp(&files[b].duration_secs)
@@ -181,7 +187,9 @@ pub struct PresetPicker {
 
 impl PresetPicker {
     fn new(current_preset: usize) -> Self {
-        Self { cursor: current_preset }
+        Self {
+            cursor: current_preset,
+        }
     }
 }
 
@@ -221,15 +229,27 @@ impl CleanupDialog {
     }
 
     pub fn selected_count(&self) -> usize {
-        self.groups.iter().filter(|g| g.selected).map(|g| g.count).sum()
+        self.groups
+            .iter()
+            .filter(|g| g.selected)
+            .map(|g| g.count)
+            .sum()
     }
 
     pub fn selected_size(&self) -> u64 {
-        self.groups.iter().filter(|g| g.selected).map(|g| g.total_size).sum()
+        self.groups
+            .iter()
+            .filter(|g| g.selected)
+            .map(|g| g.total_size)
+            .sum()
     }
 
     pub fn selected_types(&self) -> Vec<JunkType> {
-        self.groups.iter().filter(|g| g.selected).map(|g| g.junk_type).collect()
+        self.groups
+            .iter()
+            .filter(|g| g.selected)
+            .map(|g| g.junk_type)
+            .collect()
     }
 
     fn handle_key(&mut self, code: KeyCode) -> CleanupAction {
@@ -358,8 +378,10 @@ pub struct App {
 
 impl App {
     pub fn new(root_path: PathBuf, config: AppConfig) -> Self {
-        let (probe_path_tx, probe_result_rx) = prober::start_background_prober(config.probe_concurrency);
-        let scan_rx = scanner::start_background_scan(root_path.clone(), config.media_extensions.clone());
+        let (probe_path_tx, probe_result_rx) =
+            prober::start_background_prober(config.probe_concurrency);
+        let scan_rx =
+            scanner::start_background_scan(root_path.clone(), config.media_extensions.clone());
         let encoder = encoder::start_encoder();
 
         Self {
@@ -416,10 +438,14 @@ impl App {
         self.selected = 0;
         self.detail_open = false;
 
-        let (probe_path_tx, probe_result_rx) = prober::start_background_prober(self.probe_concurrency);
+        let (probe_path_tx, probe_result_rx) =
+            prober::start_background_prober(self.probe_concurrency);
         self.probe_path_tx = probe_path_tx;
         self.probe_result_rx = probe_result_rx;
-        self.scan_rx = Some(scanner::start_background_scan(self.root_path.clone(), self.media_extensions.clone()));
+        self.scan_rx = Some(scanner::start_background_scan(
+            self.root_path.clone(),
+            self.media_extensions.clone(),
+        ));
         self.scan_in_progress = true;
     }
 
@@ -600,20 +626,37 @@ impl App {
                 }
                 return;
             }
-            KeyCode::Char('s') => { self.cycle_sort(); return; }
+            KeyCode::Char('s') => {
+                self.cycle_sort();
+                return;
+            }
             KeyCode::Char('S') => {
                 self.sort_ascending = !self.sort_ascending;
                 self.apply_sort();
                 return;
             }
-            KeyCode::Char('f') => { self.cycle_filter(); return; }
-            KeyCode::Char('g') => { self.toggle_grouped(); return; }
-            KeyCode::Char('d') => { self.open_cleanup_dialog(); return; }
-            KeyCode::Char('r') => {
-                if !self.is_scanning() { self.rescan(); }
+            KeyCode::Char('f') => {
+                self.cycle_filter();
                 return;
             }
-            KeyCode::Char('p') => { self.open_preset_picker(); return; }
+            KeyCode::Char('g') => {
+                self.toggle_grouped();
+                return;
+            }
+            KeyCode::Char('d') => {
+                self.open_cleanup_dialog();
+                return;
+            }
+            KeyCode::Char('r') => {
+                if !self.is_scanning() {
+                    self.rescan();
+                }
+                return;
+            }
+            KeyCode::Char('p') => {
+                self.open_preset_picker();
+                return;
+            }
             KeyCode::Char('e') => {
                 self.enqueue_all_encodeable();
                 return;
@@ -727,9 +770,15 @@ impl App {
                 // Stop queue: drop all queued jobs, let current encode finish
                 self.stop_queue();
             }
-            KeyCode::Char('p') => { self.open_preset_picker(); }
-            KeyCode::Char('P') => { self.stamp_preset_and_advance(); }
-            KeyCode::Char('h') => { self.show_legend = true; }
+            KeyCode::Char('p') => {
+                self.open_preset_picker();
+            }
+            KeyCode::Char('P') => {
+                self.stamp_preset_and_advance();
+            }
+            KeyCode::Char('h') => {
+                self.show_legend = true;
+            }
             _ => {}
         }
 
@@ -807,7 +856,8 @@ impl App {
         }
 
         // Remove deleted files from junk_files list
-        self.junk_files.retain(|jf| !selected_types.contains(&jf.junk_type));
+        self.junk_files
+            .retain(|jf| !selected_types.contains(&jf.junk_type));
 
         // Update dialog with result message or close
         if failed > 0 {
@@ -943,7 +993,10 @@ impl App {
 
         let mut rows: Vec<ListRow> = Vec::with_capacity(
             root_files.len()
-                + folder_buckets.iter().map(|(_, f)| f.len() + 1).sum::<usize>(),
+                + folder_buckets
+                    .iter()
+                    .map(|(_, f)| f.len() + 1)
+                    .sum::<usize>(),
         );
         for fi in root_files {
             rows.push(ListRow::Media(fi));
@@ -1023,7 +1076,6 @@ impl App {
         }
     }
 
-
     /// Estimate how many lines the detail view has for the selected row
     fn detail_line_count(&self) -> u16 {
         match self.selected_row() {
@@ -1038,8 +1090,12 @@ impl App {
         let mut lines: u16 = 0;
         // FILE section: header + path + size + optional format + optional duration
         lines += 1 + 1 + 1;
-        if file.container_format.is_some() { lines += 1; }
-        if file.duration_secs.is_some() { lines += 1; }
+        if file.container_format.is_some() {
+            lines += 1;
+        }
+        if file.duration_secs.is_some() {
+            lines += 1;
+        }
 
         if !file.is_probed() {
             return lines + 2; // "Probing..." or error
@@ -1048,17 +1104,33 @@ impl App {
         for vs in &file.video_streams {
             lines += 2; // blank + header
             lines += 1; // codec
-            if vs.codec_long.is_some() { lines += 1; }
-            if vs.width > 0 { lines += 1; }
-            if vs.bitrate.is_some() { lines += 1; }
-            if vs.fps.is_some() { lines += 1; }
-            if vs.pixel_format.is_some() { lines += 1; }
+            if vs.codec_long.is_some() {
+                lines += 1;
+            }
+            if vs.width > 0 {
+                lines += 1;
+            }
+            if vs.bitrate.is_some() {
+                lines += 1;
+            }
+            if vs.fps.is_some() {
+                lines += 1;
+            }
+            if vs.pixel_format.is_some() {
+                lines += 1;
+            }
         }
         for audio in &file.audio_streams {
             lines += 2 + 1 + 1 + 1; // blank + header + codec + channels + sample_rate
-            if audio.codec_long.is_some() { lines += 1; }
-            if audio.bitrate.is_some() { lines += 1; }
-            if audio.language.is_some() { lines += 1; }
+            if audio.codec_long.is_some() {
+                lines += 1;
+            }
+            if audio.bitrate.is_some() {
+                lines += 1;
+            }
+            if audio.language.is_some() {
+                lines += 1;
+            }
         }
         if !file.subtitle_streams.is_empty() {
             lines += 2; // blank + header
@@ -1074,12 +1146,19 @@ impl App {
             match event {
                 EncodeEvent::StatusChange { job_id, status } => {
                     if let Some(job) = self.encode_queue.iter_mut().find(|j| j.id == job_id) {
-                        if job.started_at.is_none() && matches!(status, EncodeStatus::CopyingToTemp | EncodeStatus::Encoding) {
+                        if job.started_at.is_none()
+                            && matches!(
+                                status,
+                                EncodeStatus::CopyingToTemp | EncodeStatus::Encoding
+                            )
+                        {
                             job.started_at = Some(std::time::Instant::now());
                         }
                         job.status = match status {
                             EncodeStatus::CopyingToTemp => EncodeJobStatus::CopyingToTemp,
-                            EncodeStatus::Encoding | EncodeStatus::Resumed => EncodeJobStatus::Encoding,
+                            EncodeStatus::Encoding | EncodeStatus::Resumed => {
+                                EncodeJobStatus::Encoding
+                            }
                             EncodeStatus::Paused => EncodeJobStatus::Paused,
                             EncodeStatus::Validating => EncodeJobStatus::Validating,
                         };
@@ -1093,13 +1172,19 @@ impl App {
                 }
                 EncodeEvent::Completed { job_id, result } => {
                     // Find the job's file_index before mutating status
-                    let file_index = self.encode_queue.iter()
+                    let file_index = self
+                        .encode_queue
+                        .iter()
                         .find(|j| j.id == job_id)
                         .map(|j| j.file_index);
 
                     if let Some(job) = self.encode_queue.iter_mut().find(|j| j.id == job_id) {
                         job.status = match result {
-                            EncodeResult::Success { encoded_size, saved_percent, ref final_path } => {
+                            EncodeResult::Success {
+                                encoded_size,
+                                saved_percent,
+                                ref final_path,
+                            } => {
                                 // Update the MediaFile to reflect new codec/size/path
                                 if let Some(fi) = file_index {
                                     if let Some(file) = self.files.get_mut(fi) {
@@ -1114,7 +1199,10 @@ impl App {
                                 }
                                 // Update queue entry so the size column reflects the encoded size
                                 job.file_size = encoded_size;
-                                EncodeJobStatus::Done { encoded_size, saved_percent }
+                                EncodeJobStatus::Done {
+                                    encoded_size,
+                                    saved_percent,
+                                }
                             }
                             EncodeResult::Failed(msg) => EncodeJobStatus::Failed(msg),
                             EncodeResult::Cancelled => EncodeJobStatus::Cancelled,
@@ -1135,7 +1223,10 @@ impl App {
             return;
         }
         // Find next Queued job
-        let next = self.encode_queue.iter().find(|j| matches!(j.status, EncodeJobStatus::Queued));
+        let next = self
+            .encode_queue
+            .iter()
+            .find(|j| matches!(j.status, EncodeJobStatus::Queued));
         let next = match next {
             Some(j) => j,
             None => return,
@@ -1147,7 +1238,11 @@ impl App {
             None => return,
         };
 
-        let preset = self.presets.iter().find(|p| p.name == next.preset_name).cloned();
+        let preset = self
+            .presets
+            .iter()
+            .find(|p| p.name == next.preset_name)
+            .cloned();
         let preset = match preset {
             Some(p) => p,
             None => return,
@@ -1192,7 +1287,8 @@ impl App {
 
     /// Drop all queued jobs but let the currently encoding item finish.
     pub fn stop_queue(&mut self) {
-        self.encode_queue.retain(|j| !matches!(j.status, EncodeJobStatus::Queued));
+        self.encode_queue
+            .retain(|j| !matches!(j.status, EncodeJobStatus::Queued));
         if self.encode_queue_selected >= self.encode_queue.len() {
             self.encode_queue_selected = self.encode_queue.len().saturating_sub(1);
         }
@@ -1226,7 +1322,9 @@ impl App {
 
     /// Whether the current job is paused.
     pub fn is_encoding_paused(&self) -> bool {
-        self.encode_queue.iter().any(|j| matches!(j.status, EncodeJobStatus::Paused))
+        self.encode_queue
+            .iter()
+            .any(|j| matches!(j.status, EncodeJobStatus::Paused))
     }
 
     pub fn codec_counts(&self) -> (usize, usize, usize, usize) {
@@ -1438,8 +1536,7 @@ impl App {
         };
         let encodeable: Vec<usize> = (0..self.files.len())
             .filter(|&i| {
-                self.files[i].path.parent() == Some(folder_path.as_path())
-                    && self.is_encodeable(i)
+                self.files[i].path.parent() == Some(folder_path.as_path()) && self.is_encodeable(i)
             })
             .collect();
 
@@ -1465,7 +1562,9 @@ impl App {
         if let Some(job) = self.encode_queue.get(queue_index) {
             if job.status.is_removable() {
                 self.encode_queue.remove(queue_index);
-                if self.encode_queue_selected >= self.encode_queue.len() && self.encode_queue_selected > 0 {
+                if self.encode_queue_selected >= self.encode_queue.len()
+                    && self.encode_queue_selected > 0
+                {
                     self.encode_queue_selected -= 1;
                 }
                 return true;
@@ -1477,11 +1576,15 @@ impl App {
     /// Remove a queued job by file index (toggle behavior for Enter key in list view).
     /// Only removes jobs with Queued status. Returns true if a job was removed.
     pub fn try_unqueue_file(&mut self, file_index: usize) -> bool {
-        if let Some(pos) = self.encode_queue.iter().position(|j| {
-            j.file_index == file_index && matches!(j.status, EncodeJobStatus::Queued)
-        }) {
+        if let Some(pos) = self
+            .encode_queue
+            .iter()
+            .position(|j| j.file_index == file_index && matches!(j.status, EncodeJobStatus::Queued))
+        {
             self.encode_queue.remove(pos);
-            if self.encode_queue_selected >= self.encode_queue.len() && self.encode_queue_selected > 0 {
+            if self.encode_queue_selected >= self.encode_queue.len()
+                && self.encode_queue_selected > 0
+            {
                 self.encode_queue_selected -= 1;
             }
             return true;
