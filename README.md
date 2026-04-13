@@ -4,6 +4,8 @@ Rust TUI for batch media file discovery, inspection (`ffprobe`), and HEVC encodi
 
 ![Rust](https://img.shields.io/badge/Rust-2024_edition-orange)
 
+![Encoding View](assets/encodingView.png)
+
 ## Requirements
 
 | | Binary | Docker |
@@ -70,6 +72,17 @@ docker run -it \
   -v ./encoding.yaml:/etc/mcc/encoding.yaml \
   mcc
 ```
+
+**tmpfs temp dir** - encoding entirely in RAM (zero disk I/O):
+```bash
+docker run -it \
+  -e MCC_TEMP_DIR=/encoding \
+  -v ~/Movies:/media \
+  --tmpfs /encoding:size=4G \
+  mcc
+```
+
+> **Note:** The temp dir holds a source copy and the encoded output simultaneously. Size it to ~2x your largest file. 2G is fine for 720p, 8G+ for large 4K files. Only use this if you have RAM to spare — the encoder will fail if tmpfs fills up.
 
 ### Docker Volumes
 
