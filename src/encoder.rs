@@ -168,7 +168,11 @@ async fn encode_one(
         }
         FfmpegResult::Failed(msg) => {
             // Determine which fallback to try based on error
-            let fallback = if msg.contains("unknown codec")
+            let fallback = if msg.contains("attached pic")
+                || msg.contains("attached_pic")
+            {
+                Some(Fallback::AttachedPic)
+            } else if msg.contains("unknown codec")
                 || msg.contains("Unknown codec")
                 || msg.contains("Could not find codec parameters")
                 || msg.contains("unknown encoder")
@@ -282,7 +286,29 @@ async fn encode_one(
     .await
     {
         Ok(()) => {
-            // Copy permissions from original
+            // Check if encoding actually saved space
+            let encoded_size = match tokio::fs::metadata(&hevc_copy_path).await {
+                Ok(m) => m.len(),
+                Err(e) => {
+                    return EncodeResult::Failed(format!(
+                        "Failed to read encoded file size: {}",
+                        e
+                    ));
+                }
+            };
+
+            if encoded_size >= request.file_size {
+                let _ = tokio::fs::remove_file(&hevc_copy_path).await;
+                let increase =
+                    (encoded_size as f64 / request.file_size as f64 - 1.0) * 100.0;
+                return EncodeResult::Failed(format!(
+                    "Skipped: HEVC encode is larger than original ({:.1}% bigger, {} → {}). Keeping original file.",
+                    increase,
+                    format_size(request.file_size),
+                    format_size(encoded_size),
+                ));
+            }
+
             // Copy permissions from original
             if let Ok(meta) = std::fs::metadata(&request.source_path) {
                 let _ = std::fs::set_permissions(&hevc_copy_path, meta.permissions());
@@ -313,10 +339,6 @@ async fn encode_one(
                 eprintln!("Warning: rename failed: {}", e);
             }
 
-            let encoded_size = match tokio::fs::metadata(&final_path).await {
-                Ok(m) => m.len(),
-                Err(_) => 0,
-            };
             let saved_percent = if request.file_size > 0 {
                 (1.0 - (encoded_size as f64 / request.file_size as f64)) * 100.0
             } else {
@@ -368,6 +390,8 @@ async fn run_ffmpeg(
 
 #[derive(Clone, Copy)]
 enum Fallback {
+    /// Replace "-map 0" with "-map 0:v:0 -map 0:a? -map 0:s?" to skip attached pictures
+    AttachedPic,
     /// Replace "-map 0" with "-map 0:v -map 0:a -map 0:s?" to skip data/attachment streams
     StreamFilter,
     /// Insert "-c:s srt" after "-c copy" for subtitle codec issues
@@ -394,6 +418,27 @@ async fn run_ffmpeg_with_fallback(
 
     let mut modified_args = Vec::new();
     match fallback {
+        Fallback::AttachedPic => {
+            // Replace "-map" "0" with "-map" "0:v:0" "-map" "0:a?" "-map" "0:s?"
+            // This maps only the first (real) video stream, skipping attached pictures
+            let mut i = 0;
+            while i < preset.ffmpeg_args.len() {
+                if preset.ffmpeg_args[i] == "-map"
+                    && preset.ffmpeg_args.get(i + 1).map(|s| s.as_str()) == Some("0")
+                {
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:v:0".to_string());
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:a?".to_string());
+                    modified_args.push("-map".to_string());
+                    modified_args.push("0:s?".to_string());
+                    i += 2;
+                } else {
+                    modified_args.push(preset.ffmpeg_args[i].clone());
+                    i += 1;
+                }
+            }
+        }
         Fallback::StreamFilter => {
             // Replace "-map" "0" with "-map" "0:v" "-map" "0:a" "-map" "0:s?"
             let mut i = 0;
@@ -881,6 +926,21 @@ fn simple_hash(path: &Path) -> String {
         hash = hash.wrapping_mul(31).wrapping_add(byte as u64);
     }
     format!("{:016x}", hash)
+}
+
+fn format_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * KB;
+    const GB: u64 = 1024 * MB;
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.0} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
 }
 
 async fn cleanup_temp(source: &Path, output: &Path) {
