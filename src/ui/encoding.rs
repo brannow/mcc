@@ -77,10 +77,16 @@ fn render_queue_table(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
                 Style::default().fg(theme::TEXT),
             ));
 
-            let preset_cell = Cell::from(Span::styled(
-                job.preset_name.as_str(),
-                Style::default().fg(theme::ACCENT),
-            ));
+            let preset_cell = match job.preset_name.as_deref() {
+                Some(name) => Cell::from(Span::styled(
+                    name.to_string(),
+                    Style::default().fg(theme::ACCENT),
+                )),
+                None => Cell::from(Span::styled(
+                    "unassigned",
+                    Style::default().fg(theme::TEXT_DIM),
+                )),
+            };
 
             let (status_text, status_color) = status_display(&job.status);
             let status_content = match &job.status {
@@ -158,10 +164,15 @@ fn render_queue_table(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
             format!(" [{}] ", preset.name),
             Style::default().fg(theme::ACCENT),
         )])
-    } else {
+    } else if app.presets.is_empty() {
         Line::from(vec![Span::styled(
             " [no presets] ",
             Style::default().fg(theme::CODEC_ERROR),
+        )])
+    } else {
+        Line::from(vec![Span::styled(
+            " [press p to pick preset] ",
+            Style::default().fg(theme::TEXT_DIM),
         )])
     };
 
@@ -260,15 +271,27 @@ fn render_detail(f: &mut Frame, app: &App, area: Rect, active: bool) {
             Span::styled(&job.file_name, Style::default().fg(theme::TEXT_BRIGHT)),
         ]),
         Line::from({
-            let mut spans = vec![
-                Span::styled("  Preset:  ", Style::default().fg(theme::LABEL)),
-                Span::styled(&job.preset_name, Style::default().fg(theme::ACCENT)),
-            ];
-            if let Some(preset) = app.presets.iter().find(|p| p.name == job.preset_name) {
-                spans.push(Span::styled(
-                    format!("  {}", preset.summary()),
+            let mut spans = vec![Span::styled(
+                "  Preset:  ",
+                Style::default().fg(theme::LABEL),
+            )];
+            match job.preset_name.as_deref() {
+                Some(name) => {
+                    spans.push(Span::styled(
+                        name.to_string(),
+                        Style::default().fg(theme::ACCENT),
+                    ));
+                    if let Some(preset) = app.presets.iter().find(|p| p.name == name) {
+                        spans.push(Span::styled(
+                            format!("  {}", preset.summary()),
+                            Style::default().fg(theme::TEXT_DIM),
+                        ));
+                    }
+                }
+                None => spans.push(Span::styled(
+                    "unassigned",
                     Style::default().fg(theme::TEXT_DIM),
-                ));
+                )),
             }
             spans
         }),
@@ -483,7 +506,10 @@ fn render_job_summary(f: &mut Frame, job: &crate::model::EncodeJob, area: Rect) 
         ]),
         Line::from(vec![
             Span::styled("  Preset:  ", Style::default().fg(theme::LABEL)),
-            Span::styled(&job.preset_name, Style::default().fg(theme::ACCENT)),
+            match job.preset_name.as_deref() {
+                Some(name) => Span::styled(name.to_string(), Style::default().fg(theme::ACCENT)),
+                None => Span::styled("unassigned", Style::default().fg(theme::TEXT_DIM)),
+            },
         ]),
         Line::from(vec![
             Span::styled("  Status:  ", Style::default().fg(theme::LABEL)),

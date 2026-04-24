@@ -318,7 +318,7 @@ pub struct EncodeJob {
     pub fps_stats: FpsStats,
     pub started_at: Option<std::time::Instant>,
     pub elapsed_secs: Option<f64>,
-    pub preset_name: String,
+    pub preset_name: Option<String>,
 }
 
 pub fn human_duration(secs: f64) -> String {

@@ -364,7 +364,7 @@ pub struct App {
     pub encoding_pane_focus: EncodingPaneFocus,
     pub show_legend: bool,
     pub show_quit_confirm: bool,
-    pub selected_preset: usize,
+    pub selected_preset: Option<usize>,
     next_job_id: u64,
 
     encoder: EncoderHandle,
@@ -415,7 +415,7 @@ impl App {
             encoding_pane_focus: EncodingPaneFocus::Queue,
             show_legend: false,
             show_quit_confirm: false,
-            selected_preset: 0,
+            selected_preset: None,
             next_job_id: 0,
             encoder,
             scan_rx: Some(scan_rx),
@@ -1220,11 +1220,11 @@ impl App {
         if self.current_encoding_job().is_some() {
             return;
         }
-        // Find next Queued job
-        let next = self
-            .encode_queue
-            .iter()
-            .find(|j| matches!(j.status, EncodeJobStatus::Queued));
+        // Find next Queued job that has a preset assigned; jobs without a preset
+        // stay parked until the user picks one.
+        let next = self.encode_queue.iter().find(|j| {
+            matches!(j.status, EncodeJobStatus::Queued) && j.preset_name.is_some()
+        });
         let next = match next {
             Some(j) => j,
             None => return,
@@ -1236,10 +1236,14 @@ impl App {
             None => return,
         };
 
+        let preset_name = match next.preset_name.as_deref() {
+            Some(n) => n,
+            None => return,
+        };
         let preset = self
             .presets
             .iter()
-            .find(|p| p.name == next.preset_name)
+            .find(|p| p.name == preset_name)
             .cloned();
         let preset = match preset {
             Some(p) => p,
@@ -1366,9 +1370,9 @@ impl App {
             .any(|j| j.file_index == file_index && !j.status.is_finished())
     }
 
-    /// Name of the currently selected preset, or None if no presets loaded.
+    /// Name of the currently selected preset, or None if none chosen yet.
     pub fn current_preset(&self) -> Option<&EncodingPreset> {
-        self.presets.get(self.selected_preset)
+        self.presets.get(self.selected_preset?)
     }
 
     /// Open the preset picker popup.
@@ -1376,7 +1380,7 @@ impl App {
         if self.presets.is_empty() {
             return;
         }
-        self.preset_picker = Some(PresetPicker::new(self.selected_preset));
+        self.preset_picker = Some(PresetPicker::new(self.selected_preset.unwrap_or(0)));
     }
 
     /// Handle key input while the preset picker is open.
@@ -1424,7 +1428,7 @@ impl App {
     /// Apply the chosen preset. In List view, sets the default. In Encoding view,
     /// also updates the currently selected queued job.
     fn apply_preset_choice(&mut self, preset_index: usize) {
-        self.selected_preset = preset_index;
+        self.selected_preset = Some(preset_index);
 
         // In encoding view: update the selected queue item's preset (if it's still queued)
         if self.active_view == ActiveView::Encoding
@@ -1433,7 +1437,7 @@ impl App {
             && matches!(job.status, EncodeJobStatus::Queued)
             && let Some(preset) = self.presets.get(preset_index)
         {
-            job.preset_name = preset.name.clone();
+            job.preset_name = Some(preset.name.clone());
         }
     }
 
@@ -1443,14 +1447,14 @@ impl App {
         if self.encode_queue.is_empty() || self.presets.is_empty() {
             return;
         }
-        let preset_name = match self.presets.get(self.selected_preset) {
+        let preset_name = match self.selected_preset.and_then(|i| self.presets.get(i)) {
             Some(p) => p.name.clone(),
             None => return,
         };
         if let Some(job) = self.encode_queue.get_mut(self.encode_queue_selected)
             && matches!(job.status, EncodeJobStatus::Queued)
         {
-            job.preset_name = preset_name;
+            job.preset_name = Some(preset_name);
         }
         // Advance to next row
         let len = self.encode_queue.len();
@@ -1460,12 +1464,13 @@ impl App {
     }
 
     /// Add a single file to the encoding queue. Returns the job id, or None
-    /// if the file isn't encodeable, is already queued, or no preset is selected.
+    /// if the file isn't encodeable or is already queued. Jobs may be queued
+    /// without a preset; the encoder skips them until one is assigned.
     pub fn enqueue_file(&mut self, file_index: usize) -> Option<u64> {
         if !self.is_encodeable(file_index) || self.is_in_queue(file_index) {
             return None;
         }
-        let preset_name = self.current_preset()?.name.clone();
+        let preset_name = self.current_preset().map(|p| p.name.clone());
         let file = &self.files[file_index];
         let id = self.next_job_id;
         self.next_job_id += 1;

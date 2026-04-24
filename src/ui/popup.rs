@@ -301,7 +301,7 @@ pub fn render_preset_picker(
     f: &mut Frame,
     picker: &PresetPicker,
     presets: &[EncodingPreset],
-    selected_preset: usize,
+    selected_preset: Option<usize>,
     active_view: ActiveView,
 ) {
     let area = f.area();
@@ -379,7 +379,7 @@ pub fn render_preset_picker(
     let mut lines: Vec<Line> = Vec::new();
     for (i, preset) in presets.iter().enumerate() {
         let is_cursor = i == picker.cursor;
-        let is_default = i == selected_preset;
+        let is_default = selected_preset == Some(i);
 
         let cursor_char = if is_cursor { ">" } else { " " };
         let number = format!("{}", i + 1);
