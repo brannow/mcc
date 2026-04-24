@@ -1222,9 +1222,10 @@ impl App {
         }
         // Find next Queued job that has a preset assigned; jobs without a preset
         // stay parked until the user picks one.
-        let next = self.encode_queue.iter().find(|j| {
-            matches!(j.status, EncodeJobStatus::Queued) && j.preset_name.is_some()
-        });
+        let next = self
+            .encode_queue
+            .iter()
+            .find(|j| matches!(j.status, EncodeJobStatus::Queued) && j.preset_name.is_some());
         let next = match next {
             Some(j) => j,
             None => return,
@@ -1240,11 +1241,7 @@ impl App {
             Some(n) => n,
             None => return,
         };
-        let preset = self
-            .presets
-            .iter()
-            .find(|p| p.name == preset_name)
-            .cloned();
+        let preset = self.presets.iter().find(|p| p.name == preset_name).cloned();
         let preset = match preset {
             Some(p) => p,
             None => return,
