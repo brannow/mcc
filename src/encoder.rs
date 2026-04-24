@@ -168,9 +168,7 @@ async fn encode_one(
         }
         FfmpegResult::Failed(msg) => {
             // Determine which fallback to try based on error
-            let fallback = if msg.contains("attached pic")
-                || msg.contains("attached_pic")
-            {
+            let fallback = if msg.contains("attached pic") || msg.contains("attached_pic") {
                 Some(Fallback::AttachedPic)
             } else if msg.contains("unknown codec")
                 || msg.contains("Unknown codec")
@@ -299,8 +297,7 @@ async fn encode_one(
 
             if encoded_size >= request.file_size {
                 let _ = tokio::fs::remove_file(&hevc_copy_path).await;
-                let increase =
-                    (encoded_size as f64 / request.file_size as f64 - 1.0) * 100.0;
+                let increase = (encoded_size as f64 / request.file_size as f64 - 1.0) * 100.0;
                 return EncodeResult::Failed(format!(
                     "Skipped: HEVC encode is larger than original ({:.1}% bigger, {} → {}). Keeping original file.",
                     increase,
@@ -755,24 +752,22 @@ impl ProgressBuilder {
                 // "2.34x" or "N/A"
                 self.speed = value.trim_end_matches('x').parse().unwrap_or(0.0);
             }
-            "progress" => {
-                if value == "continue" || value == "end" {
-                    let out_time_secs = self.out_time_us as f64 / 1_000_000.0;
-                    let percent = match duration_secs {
-                        Some(d) if d > 0.0 => (out_time_secs / d * 100.0).min(100.0),
-                        _ => 0.0,
-                    };
+            "progress" if value == "continue" || value == "end" => {
+                let out_time_secs = self.out_time_us as f64 / 1_000_000.0;
+                let percent = match duration_secs {
+                    Some(d) if d > 0.0 => (out_time_secs / d * 100.0).min(100.0),
+                    _ => 0.0,
+                };
 
-                    return Some(FfmpegProgress {
-                        frame: self.frame,
-                        fps: self.fps,
-                        bitrate_kbps: self.bitrate_kbps,
-                        total_size: self.total_size,
-                        out_time_secs,
-                        speed: self.speed,
-                        percent,
-                    });
-                }
+                return Some(FfmpegProgress {
+                    frame: self.frame,
+                    fps: self.fps,
+                    bitrate_kbps: self.bitrate_kbps,
+                    total_size: self.total_size,
+                    out_time_secs,
+                    speed: self.speed,
+                    percent,
+                });
             }
             _ => {}
         }

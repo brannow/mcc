@@ -255,10 +255,8 @@ impl CleanupDialog {
     fn handle_key(&mut self, code: KeyCode) -> CleanupAction {
         match self.focus {
             CleanupFocus::List => match code {
-                KeyCode::Up => {
-                    if self.cursor > 0 {
-                        self.cursor -= 1;
-                    }
+                KeyCode::Up if self.cursor > 0 => {
+                    self.cursor -= 1;
                 }
                 KeyCode::Down => {
                     if self.cursor + 1 < self.groups.len() {
@@ -663,11 +661,10 @@ impl App {
             }
             KeyCode::Enter => {
                 match self.selected_row() {
-                    Some(ListRow::Media(file_idx)) => {
-                        if !self.try_unqueue_file(file_idx) {
-                            self.enqueue_file(file_idx);
-                        }
+                    Some(ListRow::Media(file_idx)) if !self.try_unqueue_file(file_idx) => {
+                        self.enqueue_file(file_idx);
                     }
+                    Some(ListRow::Media(_)) => {}
                     Some(ListRow::Folder(folder_idx)) => {
                         self.toggle_folder_queue(folder_idx);
                     }
@@ -737,16 +734,14 @@ impl App {
                     EncodingPaneFocus::Telemetry => EncodingPaneFocus::Queue,
                 };
             }
-            KeyCode::Char('x') | KeyCode::Delete => {
-                if self.encoding_pane_focus == EncodingPaneFocus::Queue {
-                    self.remove_from_queue(self.encode_queue_selected);
-                }
+            KeyCode::Char('x') | KeyCode::Delete
+                if self.encoding_pane_focus == EncodingPaneFocus::Queue =>
+            {
+                self.remove_from_queue(self.encode_queue_selected);
             }
-            KeyCode::Enter => {
+            KeyCode::Enter if !self.is_encoding_active() && self.queued_count() > 0 => {
                 // Start encoding if not already running
-                if !self.is_encoding_active() && self.queued_count() > 0 {
-                    self.start_encoding();
-                }
+                self.start_encoding();
             }
             KeyCode::Char(' ') => {
                 // Toggle pause/resume
@@ -756,11 +751,9 @@ impl App {
                     self.pause_encoding();
                 }
             }
-            KeyCode::Char('c') => {
+            KeyCode::Char('c') if self.is_encoding_active() => {
                 // Cancel current encode, next queued job picks up
-                if self.is_encoding_active() {
-                    self.cancel_current_encode();
-                }
+                self.cancel_current_encode();
             }
             KeyCode::Char('C') => {
                 // Cancel everything: kill current + drop all queued jobs

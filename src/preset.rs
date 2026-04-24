@@ -153,7 +153,7 @@ fn load_config_file(path: &Path) -> Result<AppConfig, String> {
         })
         .collect();
 
-    presets.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    presets.sort_by_key(|p| p.name.to_lowercase());
 
     Ok(AppConfig {
         probe_concurrency: config
@@ -219,7 +219,7 @@ mod tests {
                 "ffmpeg_args must not be empty"
             );
             assert!(
-                preset.temp_dir.as_os_str().len() > 0,
+                !preset.temp_dir.as_os_str().is_empty(),
                 "temp_dir must be resolved"
             );
         }
@@ -227,7 +227,7 @@ mod tests {
         // Presets should be sorted by name
         let names: Vec<&str> = config.presets.iter().map(|p| p.name.as_str()).collect();
         let mut sorted = names.clone();
-        sorted.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+        sorted.sort_by_key(|a| a.to_lowercase());
         assert_eq!(names, sorted, "Presets should be sorted alphabetically");
 
         // Global settings should have sensible defaults
