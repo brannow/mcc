@@ -68,3 +68,23 @@ presets:
       - copy
       - -c:v
       - libx265
+
+  series_720p:
+    target_format: mkv
+    target_codec: hevc
+    # scale=w=-2:h=min(ih\,720): clamp height to 720, auto-width (aspect ratio preserved, no upscale)
+    # works for all aspect ratios — IMAX 1.43:1→960x720, 2.39:1→1728x720, 16:9→1280x720
+    # preset slow: 720p has 44% of 1080p pixels so slow costs roughly the same wall-clock as medium@1080p
+    ffmpeg_args:
+      - -vf
+      - 'scale=w=-2:h=min(ih\,720)'
+      - -crf
+      - "22"
+      - -preset
+      - slow
+      - -map
+      - "0"
+      - -c
+      - copy
+      - -c:v
+      - libx265
